@@ -70,8 +70,10 @@ def bench_trt(engine_bytes, w, h, scale):
     y = torch.empty(1, 3, h * scale, w * scale, device="cuda", dtype=torch.half)
     ctx.set_tensor_address("input", x.data_ptr())
     ctx.set_tensor_address("output", y.data_ptr())
-    stream = torch.cuda.current_stream().cuda_stream
-    return time_cuda(lambda: ctx.execute_async_v3(stream))
+    # a dedicated stream: on the default stream TensorRT adds extra synchronisation
+    stream = torch.cuda.Stream()
+    with torch.cuda.stream(stream):
+        return time_cuda(lambda: ctx.execute_async_v3(stream.cuda_stream))
 
 
 def main():

@@ -13,7 +13,8 @@ Goal: an honest, repeatable way to compare upscalers.
 
 ## Part 2 — Engine
 - [ ] mpv + VapourSynth + vs-mlrt (TensorRT) running an existing compact model.
-- [ ] FPS table on the reference GPU (RTX 4050 Laptop 6 GB): 480p→1440p and 720p→1440p, FP16.
+- [x] Speed table on the reference GPU (RTX 4050 Laptop 6 GB), TensorRT FP16, x2 from 480p and 720p — [results](speed-results.md)
+- [ ] Full player pipeline (mpv + VapourSynth + TensorRT) with a real model
 - [ ] Engine cache, first-run engine build UX.
 
 ## Part 3 — Own live-action model

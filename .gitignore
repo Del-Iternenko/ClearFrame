@@ -21,3 +21,4 @@ vendor/
 bench/cache/
 .venv/
 __pycache__/
+engine/out/
