@@ -21,7 +21,18 @@ Close-up (left to right: original, source, bicubic, RTX VSR):
 
 **Takeaway:** on a heavily compressed source, driver RTX VSR is visually almost identical to bicubic and slightly *further* from the original by PSNR/SSIM. It smooths, but does not restore detail or text. This matches what our first tester saw on real web video and is the baseline ClearFrame has to beat.
 
-Next: add neural models through TensorRT (roadmap part 2) and a harder 3x source (640x267).
+### Preview: what a heavy neural model can do (not real-time)
+
+Same frame (t = 10 s), same 3x zoom. Real-ESRGAN models run through `realesrgan-ncnn-vulkan` v0.2.5.0 (Vulkan, not Tensor Cores), x4 output resized to 1920x800.
+
+![Original, source, bicubic, RTX VSR, Real-ESRGAN x4plus, Real-ESRGAN AnimeVideo v3](img/bench-v1-neural-preview.png)
+
+- **Real-ESRGAN x4plus** (large general model) restores hard edges — cables, hull outlines, lamps, lettering — that every other variant leaves blurred. But it also flattens texture: smoke and metal turn into smooth, painted-looking areas. ~5 s per 960x400 frame on an RTX 4050 Laptop (incl. model load) — far from the 42 ms real-time budget at 24 fps.
+- **Real-ESRGAN AnimeVideo v3** (compact, anime-trained) is fast but looks close to bicubic on live action.
+
+That is the target in one picture: x4plus-level edge restoration, without the painted look, at real-time speed on Tensor Cores.
+
+Next: neural models through TensorRT (roadmap part 2) and a harder 3x source (640x267).
 
 ---
 Footage: "Tears of Steel" (CC BY 3.0) (c) Blender Foundation | mango.blender.org
