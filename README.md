@@ -2,8 +2,6 @@
 
 **Real-time neural upscaling for movies and TV on NVIDIA RTX.** Turn soft, over-compressed 480p–720p video into a clean 1440p picture while you watch, using the Tensor Cores of your GeForce RTX GPU.
 
-> 🇷🇺 Русская версия ниже.
-
 > **Status: early development.** Nothing to download yet — the project is being built in the open, step by step. See the [roadmap](docs/roadmap.md).
 
 ## Why
@@ -45,18 +43,3 @@ ClearFrame's own code: [MIT](LICENSE). Bundled third-party components (mpv, Vapo
 
 ClearFrame is a general video-enhancement tool. Use it with content you have the right to watch.
 
----
-
-## 🇷🇺 ClearFrame
-
-**Нейросетевой апскейл фильмов и сериалов в реальном времени на NVIDIA RTX.** Мыльное, пережатое видео 480p–720p превращается в чистую картинку 1440p прямо во время просмотра — на тензорных ядрах видеокарты GeForce RTX.
-
-> **Статус: ранняя разработка.** Скачивать пока нечего — проект собирается открыто, по шагам. См. [план](docs/roadmap.md).
-
-**Зачем.** Огромная часть видео, которое люди смотрят каждый день, — низкое разрешение и сильное сжатие: квадраты в тенях, полосы, «мыльные» лица. Быстрые нейросетевые апскейлеры в основном обучены на **аниме**, а RTX Video Super Resolution в драйвере универсальный и осторожный. Открытой модели реального времени для **живого видео, испорченного сжатием**, нет — эту дыру и закрывает ClearFrame.
-
-**Как работает (план):** mpv + VapourSynth → модель ONNX, скомпилированная в TensorRT (FP16) под вашу видеокарту → апскейл ×2 на тензорных ядрах → 1440p. Своя компактная модель, обученная на живом видео с реалистичными «стриминговыми» повреждениями. Автопрофиль подбирает модель под разрешение и видеокарту. Расширение для браузера передаёт видео в плеер.
-
-**Требования:** Windows 10/11, NVIDIA GeForce RTX 20/30/40/50, свежий драйвер.
-
-**Лицензия:** код — MIT; сторонние компоненты — под своими лицензиями. Используйте с контентом, который вы вправе смотреть.

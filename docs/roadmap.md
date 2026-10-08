@@ -4,10 +4,12 @@ Each part ends with something you can see or measure. We don't move on until it 
 
 ## Part 1 — Benchmark bench `bench/`
 Goal: an honest, repeatable way to compare upscalers.
-- [ ] Test clips: open-licensed live-action footage (e.g. Blender *Tears of Steel*, CC-BY) degraded like web streams: 480p/720p, ~0.7–1.5 Mbit/s H.264, banding in dark scenes.
-- [ ] Variants: bicubic (what a browser does), driver RTX VSR, FSR 1, existing neural models.
-- [ ] Output: side-by-side video, split-screen video, zoomed crops, metrics (PSNR/SSIM vs the clean original, plus LPIPS when available).
-- [ ] Known issue: mpv encode mode (`--o`) has no D3D11 device, so `d3d11vpp` (RTX VSR) can't render to a file that way — capture frames from a real VO instead.
+- [x] Test clips: open-licensed live-action footage (e.g. Blender *Tears of Steel*, CC-BY) degraded like web streams: 480p/720p, ~0.7–1.5 Mbit/s H.264, banding in dark scenes.
+- [x] Variants: bicubic (what a browser does), driver RTX VSR — [first results](bench-results.md)
+- [ ] Variants: FSR 1, existing neural models
+- [x] Output: split-screen video, zoomed crops, PSNR/SSIM vs the clean original
+- [ ] LPIPS (perceptual metric)
+- [x] mpv encode mode (`--o`) has no D3D11 device, so RTX VSR can't render to a file; solved by playing at 0.2x speed and saving every filtered frame.
 
 ## Part 2 — Engine
 - [ ] mpv + VapourSynth + vs-mlrt (TensorRT) running an existing compact model.
@@ -27,4 +29,4 @@ Goal: an honest, repeatable way to compare upscalers.
 
 ## Part 5 — Release
 - [ ] GitHub releases with player build and model files, checksums.
-- [ ] Docs in English and Russian.
+- [ ] User docs and FAQ.
