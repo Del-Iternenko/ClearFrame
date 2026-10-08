@@ -34,11 +34,15 @@ A desktop app for viewers, streamers and film critics: YouTube in a browser, a m
 
 How it works: Windows Graphics Capture of the window or screen → video area from persistent motion → frames fed at a steady rate into mpv with RTX Video Super Resolution and deband → a window ClearFrame owns (click-through, topmost, excluded from screen capture when it lies on a captured screen). Each session runs in its own process, so a capture that hangs inside Windows can't freeze the app. The UI is plain HTML/CSS in WebView2 (pywebview), with the Inter font and Lucide icons. Settings: `%APPDATA%\ClearFrame\settings.json`, diagnostics: `%APPDATA%\ClearFrame\clearframe.log`.
 
+Build `ClearFrame.exe` (a folder with its own Python and mpv, nothing to install on the target PC):
+
 ```
 pip install -r desktop/requirements.txt   # into .venv (see engine/README.md)
 python bench/bench.py setup               # once: pinned mpv + ffmpeg into vendor/
-ClearFrame-Live.bat                       # or: pythonw desktop/main.py [--minimized]
+python desktop/build.py                   # -> dist/ClearFrame/ClearFrame.exe
 ```
+
+Or run it from source: `ClearFrame-Live.bat` (= `pythonw desktop/main.py [--minimized]`).
 
 Limits: DRM-protected services (Netflix and similar) give a black picture to every capture tool, OBS included. Games or players in *exclusive* fullscreen can't have anything drawn over them (browsers and most players use borderless fullscreen, which works). Audio stays with the original app.
 

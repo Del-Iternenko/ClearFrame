@@ -25,7 +25,9 @@ import native_res
 from host_window import HostWindow
 
 ROOT = Path(__file__).resolve().parent.parent
-MPV = ROOT / "vendor" / "mpv" / "mpv.exe"
+# packaged app (ClearFrame.exe): mpv ships next to the exe; from source: vendor/ (bench.py setup)
+MPV = (Path(sys.executable).parent / "mpv" / "mpv.exe" if getattr(sys, "frozen", False)
+       else ROOT / "vendor" / "mpv" / "mpv.exe")
 user32 = ctypes.windll.user32
 dwmapi = ctypes.windll.dwmapi
 user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))  # physical pixels, like the capture
@@ -443,7 +445,7 @@ class LiveSession:
             user32.ShowWindow(ctypes.c_void_p(out.host.hwnd), 8 if visible else 0)  # SW_SHOWNA / SW_HIDE
 
 
-def main():
+def main(argv=None):
     """Runs one session. The tray starts this as a child process (one per session), so a
     capture that hangs inside Windows can never freeze the tray: it just kills the process.
     Status lines go to stdout as 'STATUS: ...'."""
@@ -461,7 +463,7 @@ def main():
     ap.add_argument("--deband-strength", type=int, default=48)
     ap.add_argument("--deband-grain", type=int, default=16)
     ap.add_argument("--seconds", type=float, default=0, help="stop after this many seconds (0 = until closed)")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     def status(text):
         print("STATUS: " + text, flush=True)

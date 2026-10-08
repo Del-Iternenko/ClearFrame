@@ -20,6 +20,8 @@ from live_upscale import (fullscreen_window, list_windows, monitor_of_window, mo
 from settings import SOURCE_WIDTH  # noqa: E402
 
 LIVE_SCRIPT = ROOT / "live" / "live_upscale.py"
+# ClearFrame.exe runs sessions as "ClearFrame.exe --session ..."; from source: python live_upscale.py
+SESSION_CMD = [sys.executable, "--session"] if getattr(sys, "frozen", False) else [sys.executable, "-u", str(LIVE_SCRIPT)]
 LOG = Path(os.environ.get("APPDATA", ".")) / "ClearFrame" / "clearframe.log"
 CREATE_NO_WINDOW = 0x08000000
 POLL = 0.5
@@ -77,7 +79,7 @@ class Session:
         s = settings
         overlay = True if auto else s["output"] == "overlay"
         engine = "none" if s["engine"] == "none" else "rtx_driver"   # the only engines the live path has today
-        args = [sys.executable, "-u", str(LIVE_SCRIPT), "--target", str(s["window_height"]), "--engine", engine,
+        args = SESSION_CMD + ["--target", str(s["window_height"]), "--engine", engine,
                 "--fps", str(s["max_fps"]), "--deband-strength", str(int(s["deband_strength"])),
                 "--deband-grain", str(int(s["deband_grain"]))]
         args += ["--monitor", str(monitor["index"])] if monitor else ["--hwnd", str(hwnd)]
@@ -87,7 +89,7 @@ class Session:
             args.append("--no-deband")
         if SOURCE_WIDTH[s["source"]]:
             args += ["--source-width", str(SOURCE_WIDTH[s["source"]])]
-        log("run: " + " ".join(args[2:]))
+        log("run: " + " ".join(args[len(SESSION_CMD):]))
         self.proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
                                      text=True, encoding="utf-8", errors="replace", creationflags=CREATE_NO_WINDOW)
         threading.Thread(target=self._read, args=(on_status,), daemon=True).start()

@@ -23,3 +23,5 @@ bench/cache/
 __pycache__/
 engine/out/
 *.err
+build/
+dist/

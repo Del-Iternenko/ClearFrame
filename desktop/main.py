@@ -209,8 +209,11 @@ class App:
 
     # -------- autostart
     def set_autostart(self, enabled):
-        pythonw = Path(sys.executable).with_name("pythonw.exe")
-        cmd = f'"{pythonw}" "{Path(__file__).resolve()}" --minimized'
+        if getattr(sys, "frozen", False):
+            cmd = f'"{sys.executable}" --minimized'
+        else:
+            pythonw = Path(sys.executable).with_name("pythonw.exe")
+            cmd = f'"{pythonw}" "{Path(__file__).resolve()}" --minimized'
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
             if enabled:
                 winreg.SetValueEx(k, APP_NAME, 0, winreg.REG_SZ, cmd)
@@ -261,5 +264,8 @@ def already_running():
 
 
 if __name__ == "__main__":
-    if not already_running():
+    if sys.argv[1:2] == ["--session"]:   # ClearFrame.exe starting one upscaling session (see controller.Session)
+        from live_upscale import main as session_main
+        session_main(sys.argv[2:])
+    elif not already_running():
         App("--minimized" in sys.argv).run()
