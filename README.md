@@ -21,6 +21,17 @@ video ──► decode (NVDEC) ──► deblock / deband ──► neural 2× u
 - **Auto profile:** picks the scale factor and model size from the source resolution and the GPU, so playback stays real-time.
 - **Browser hand-off (optional):** a browser extension sends the video you're watching to the ClearFrame player.
 
+## Try it now (early preview)
+
+A control panel that plays a video and switches upscaling on and off while it plays:
+
+```
+python bench/bench.py setup      # once: downloads pinned mpv + ffmpeg into vendor/
+ClearFrame.bat                   # or: pythonw app/clearframe_app.py
+```
+
+Open a file or paste a URL, then toggle **UPSCALER ON/OFF** (or press `U`), pick a mode (RTX Video Super Resolution or a sharp shader scaler), a target (1080p / 1440p / 2160p) and deband strength, and hold **compare** to see the original. The status line shows source and output resolution, so you can see whether upscaling is really applied. The ClearFrame neural model will appear as a mode once it's trained.
+
 ## Requirements (target)
 
 - Windows 10/11 64-bit
