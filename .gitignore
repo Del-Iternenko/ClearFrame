@@ -1,0 +1,20 @@
+# media and generated data
+*.mp4
+*.mkv
+*.webm
+*.ts
+*.png
+*.jpg
+!docs/img/*.png
+!docs/img/*.jpg
+bench/out/
+bench/frames-*/
+# models and TensorRT engines (published as release assets, not in git)
+*.onnx
+*.engine
+*.pth
+*.safetensors
+# third-party binaries (downloaded by scripts)
+vendor/
+# logs
+*.log
