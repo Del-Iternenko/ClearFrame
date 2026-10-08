@@ -19,3 +19,5 @@ vendor/
 # logs
 *.log
 bench/cache/
+.venv/
+__pycache__/

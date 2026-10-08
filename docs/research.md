@@ -32,3 +32,17 @@ Plain GLSL/compute shaders (Anime4K, FSR, CuNNy) run on regular shader units, no
 3. **Budget:** an RTX 4050 Laptop is far below an RTX 3060 desktop, so we need a compact 2× model and to upscale 480/720p → 1440p, not 1080p → 4K.
 4. **Licensing:** only redistribute permissively licensed models; our own model solves this.
 5. **Baseline to beat:** driver RTX VSR (`d3d11vpp scaling-mode=nvidia`). First real-world feedback from our tester: on heavily compressed web video it looked barely better than plain scaling.
+
+## "DLSS 5" video/desktop projects (surveyed 2026-10-08)
+
+Read-only review of source and docs (nothing downloaded or run) of [perseval-BLR/NeuralScreen](https://github.com/perseval-BLR/NeuralScreen) and [Merserk/dlss5-visual-enhancer](https://github.com/Merserk/dlss5-visual-enhancer), both created Aug–Sep 2026.
+
+**What "DLSS 5" is there.** NGX feature 18, `nvngx_dlssnr.dll` ("Neural Rendering"). NeuralScreen's TECHNICAL.md states the bundled runtime is a *leaked* 310.8.0 build taken from a mirror; the DLL refuses non-Blackwell GPUs, and the project hooks `NvAPI_GPU_GetArchInfo` in its own process to report Blackwell on 20/30/40-series cards. The authors note this likely conflicts with NVIDIA's license. Its controls (Style, Intensity, Local Tone, Skin Structure) show it is a re-rendering/stylising effect rather than a fidelity-oriented upscaler.
+
+**Not usable for ClearFrame:** leaked binaries and architecture spoofing can't go into an open-source project.
+
+**Useful, legitimate ideas:**
+- *Motion for video.* Game upscalers need motion vectors; for video they are estimated with optical flow — NVIDIA's hardware Optical Flow Accelerator (NVOFA, `nvofapi64.dll` shipped with the driver, public Optical Flow SDK; RTX 20+) or CPU DIS as a fallback. NeuralScreen runs NVOFA on a 320x180 grayscale copy with a 4x4 grid (80x45 vectors), expands them on the GPU and feeds them as the motion texture; scene cuts reset temporal history.
+- *Temporal upscaling.* With motion vectors, the public DLSS Super Resolution runtime (redistributable through NVIDIA's DLSS SDK) can be driven as a temporal upscaler on video — Merserk's tool exposes DLAA / Quality / Balanced / Performance / Ultra Performance modes with optical-flow quality settings. Video frames are not jittered like game renders, so how much real detail this recovers has to be measured.
+
+**Takeaways:** (1) a temporal model (current frame + motion-aligned previous frames, NVOFA flow) is a promising direction for our own network, since one 480p frame carries little information; (2) official DLSS SR + NVOFA is a candidate for the bench.
