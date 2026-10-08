@@ -11,6 +11,7 @@ original application.
 """
 import argparse
 import ctypes
+import os
 import subprocess
 import sys
 import threading
@@ -21,12 +22,15 @@ import numpy as np
 from windows_capture import Frame, InternalCaptureControl, WindowsCapture
 
 import native_res
+from host_window import HostWindow
 
 ROOT = Path(__file__).resolve().parent.parent
 MPV = ROOT / "vendor" / "mpv" / "mpv.exe"
 user32 = ctypes.windll.user32
 dwmapi = ctypes.windll.dwmapi
 user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))  # physical pixels, like the capture
+user32.GetForegroundWindow.restype = ctypes.c_void_p    # handles are pointer-sized
+user32.MonitorFromWindow.restype = ctypes.c_void_p
 
 
 class RECT(ctypes.Structure):
@@ -72,6 +76,56 @@ def list_windows():
 
     user32.EnumWindows(cb, 0)
     return [(hwnd, title) for area, hwnd, title in sorted(found, reverse=True)]
+
+
+def monitors():
+    """Displays in the order Windows Graphics Capture numbers them (1-based)."""
+    found = []
+
+    class MONITORINFO(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_ulong), ("rcMonitor", RECT), ("rcWork", RECT), ("dwFlags", ctypes.c_ulong)]
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(RECT), ctypes.c_void_p)
+    def cb(hmon, hdc, rect, _):
+        info = MONITORINFO()
+        info.cbSize = ctypes.sizeof(info)
+        user32.GetMonitorInfoW(ctypes.c_void_p(hmon), ctypes.byref(info))
+        r = info.rcMonitor
+        found.append(dict(index=len(found) + 1, handle=hmon, x=r.left, y=r.top, w=r.right - r.left, h=r.bottom - r.top,
+                          primary=bool(info.dwFlags & 1)))
+        return True
+
+    user32.EnumDisplayMonitors(None, None, cb, 0)
+    return found
+
+
+SHELL_CLASSES = {"Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"}  # desktop, taskbar
+
+
+def window_class(hwnd):
+    buf = ctypes.create_unicode_buffer(256)
+    user32.GetClassNameW(ctypes.c_void_p(hwnd), buf, 256)
+    return buf.value
+
+
+def fullscreen_window():
+    """The foreground window if it covers its whole monitor (a fullscreen video), else None."""
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd or not user32.IsWindowVisible(ctypes.c_void_p(hwnd)) or user32.IsIconic(ctypes.c_void_p(hwnd)):
+        return None
+    if window_class(hwnd) in SHELL_CLASSES or window_title(hwnd).startswith("ClearFrame"):
+        return None
+    m = monitor_of_window(hwnd)
+    rect = RECT()
+    user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(rect))
+    if m and rect.left <= m["x"] and rect.top <= m["y"] and rect.right >= m["x"] + m["w"] and rect.bottom >= m["y"] + m["h"]:
+        return hwnd
+    return None
+
+
+def monitor_of_window(hwnd):
+    hmon = user32.MonitorFromWindow(ctypes.c_void_p(hwnd), 2)  # MONITOR_DEFAULTTONEAREST
+    return next((m for m in monitors() if m["handle"] == hmon), None)
 
 
 def find_window(part):
@@ -148,11 +202,14 @@ class VideoArea:
 
 
 class Output:
-    """mpv reading raw BGRA frames from stdin and showing them through RTX VSR.
-    place=None: normal window (capture it in OBS); place=(x, y, w, h): borderless,
-    click-through window lying exactly over the original video."""
+    """mpv reading raw BGRA frames from stdin and showing them through RTX VSR, drawn
+    into a window that ClearFrame owns (see host_window):
+    place=(x, y, w, h): borderless click-through overlay exactly over the original;
+    geometry=(x, y, w, h): borderless window filling that area (e.g. another monitor);
+    neither: a normal window sized for the target height (capture it in OBS).
+    exclude: hide the window from screen capture (when it lies on a captured screen)."""
 
-    def __init__(self, w, h, target, max_input, fps, place=None, native_h=None):
+    def __init__(self, w, h, target, max_input, fps, place=None, native_h=None, exclude=False, geometry=None):
         self.w, self.h = w, h
         # players and browsers already upscaled the video to the window: bring it back
         # to its real size (detected, see native_res) so the network sees real pixels;
@@ -161,7 +218,19 @@ class Output:
         in_h, in_w = int(h * k) // 2 * 2, int(w * k) // 2 * 2
         if place:
             target = place[3]
+        elif geometry:
+            target = geometry[3]
         scale = max(1.0, min(4.0, target / in_h))
+        out_w, out_h = int(in_w * scale), int(in_h * scale)
+        if place:
+            self.host = HostWindow("ClearFrame Output", *place, overlay=True, exclude_from_capture=exclude)
+        elif geometry:
+            self.host = HostWindow("ClearFrame Output", *geometry, popup=True, exclude_from_capture=exclude)
+        else:
+            # client area at the output size, shrunk to fit the screen if needed
+            fit = min(1.0, 0.9 * user32.GetSystemMetrics(0) / out_w, 0.9 * user32.GetSystemMetrics(1) / out_h)
+            self.host = HostWindow("ClearFrame Output", 100, 100, int(out_w * fit), int(out_h * fit),
+                                   exclude_from_capture=exclude)
         vf = (f"scale={in_w}:{in_h}:flags=area,format=nv12,"
               f"d3d11vpp=scale={scale:.3f}:scaling-mode=nvidia")
         args = [str(MPV), "--no-config", "--demuxer=rawvideo", f"--demuxer-rawvideo-w={w}", f"--demuxer-rawvideo-h={h}",
@@ -170,44 +239,15 @@ class Output:
                 "--untimed", "--no-cache", "--demuxer-readahead-secs=0", "--demuxer-max-bytes=1MiB",
                 "--gpu-api=d3d11", "--d3d11-adapter=NVIDIA", "--vo=gpu-next", f"--vf={vf}",
                 "--deband=yes", "--deband-iterations=4", "--deband-threshold=48", "--deband-grain=16",
-                "--title=ClearFrame Output", "--force-window=yes", "--keep-open=no", "--osd-level=0",
-                "--really-quiet", "--log-file=" + str(ROOT / "live" / "output-mpv.log")]
-        if place:
-            x, y, pw, ph = place
-            args += ["--no-border", "--ontop", "--focus-on=never", "--no-input-default-bindings",
-                     f"--geometry={pw}x{ph}+{x}+{y}", "--keepaspect-window=no"]
-        else:
-            args += ["--geometry=50%", "--input-default-bindings=yes"]
+                f"--wid={self.host.hwnd}", "--no-input-default-bindings", "--input-cursor=no", "--cursor-autohide=no",
+                "--keep-open=no", "--osd-level=0", "--really-quiet",
+                "--log-file=" + str(ROOT / "live" / "output-mpv.log")]
         self.proc = subprocess.Popen(args + ["-"], stdin=subprocess.PIPE, cwd=str(MPV.parent))
         source = f"real {in_w}x{in_h}" if native_h else f"{in_w}x{in_h}"
-        self.info = f"on screen {w}x{h} -> {source} -> RTX VSR x{scale:.2f} -> {int(in_w * scale)}x{int(in_h * scale)}"
-        if place:
-            threading.Thread(target=self._click_through, daemon=True).start()
-
-    def _click_through(self):
-        """Let mouse clicks pass to the original player and never take focus."""
-        for _ in range(100):
-            hwnd = self.window()
-            if hwnd:
-                ex = user32.GetWindowLongW(ctypes.c_void_p(hwnd), -20)  # GWL_EXSTYLE
-                user32.SetWindowLongW(ctypes.c_void_p(hwnd), -20, ex | 0x80000 | 0x20 | 0x08000000)  # LAYERED|TRANSPARENT|NOACTIVATE
-                user32.SetLayeredWindowAttributes(ctypes.c_void_p(hwnd), 0, 255, 2)  # fully opaque
-                return
-            time.sleep(0.05)
+        self.info = f"on screen {w}x{h} -> {source} -> RTX VSR x{scale:.2f} -> {out_w}x{out_h}"
 
     def window(self):
-        found = []
-        pid = ctypes.c_ulong()
-
-        @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-        def cb(hwnd, _):
-            user32.GetWindowThreadProcessId(ctypes.c_void_p(hwnd), ctypes.byref(pid))
-            if pid.value == self.proc.pid and user32.IsWindowVisible(hwnd):
-                found.append(hwnd)
-            return True
-
-        user32.EnumWindows(cb, 0)
-        return found[0] if found else None
+        return self.host.hwnd
 
     def write(self, bgra):
         try:
@@ -217,7 +257,8 @@ class Output:
             return False
 
     def alive(self):
-        return self.proc.poll() is None
+        """mpv runs and the user hasn't closed the window."""
+        return self.proc.poll() is None and not self.host.closed.is_set()
 
     def close(self):
         try:
@@ -225,15 +266,19 @@ class Output:
         except OSError:
             pass
         self.proc.terminate()
+        self.host.close()
 
 
 class LiveSession:
-    """Capture one window, find its video area, upscale it into an Output."""
+    """Capture one window (and find its video area) or a whole screen, upscale it into an Output."""
 
-    def __init__(self, hwnd, target=None, overlay=False, max_input=720, fps=60, on_status=print, source_width=None):
+    def __init__(self, hwnd=None, target=None, overlay=False, max_input=720, fps=60, on_status=print,
+                 source_width=None, monitor=None):
         """source_width: real width of the video if known (854 = 480p, 1280 = 720p...);
-        None = detect it automatically (experimental)."""
+        None = detect it automatically (experimental). monitor: a monitors() entry to
+        capture the whole screen instead of one window."""
         self.source_width = source_width
+        self.monitor = monitor
         self.hwnd, self.overlay, self.max_input, self.fps = hwnd, overlay, max_input, fps
         self.target = target or user32.GetSystemMetrics(1)
         self.on_status = on_status
@@ -247,7 +292,10 @@ class LiveSession:
         self.stopped = threading.Event()
 
     def start(self):
-        cap = WindowsCapture(cursor_capture=False, draw_border=False, window_hwnd=self.hwnd)
+        if self.monitor:
+            cap = WindowsCapture(cursor_capture=True, draw_border=False, monitor_index=self.monitor["index"])
+        else:
+            cap = WindowsCapture(cursor_capture=False, draw_border=False, window_hwnd=self.hwnd)
         cap.event(self.on_frame_arrived)
         cap.event(self.on_closed)
         self.on_status("looking for the video (play it)...")
@@ -278,6 +326,9 @@ class LiveSession:
 
     def placement(self, rect):
         """Screen rectangle of the video area (for the overlay)."""
+        if self.monitor:
+            m = self.monitor
+            return m["x"], m["y"], m["w"], m["h"]
         origin = (ctypes.c_long * 2)(0, 0)
         user32.ClientToScreen(ctypes.c_void_p(self.hwnd), origin)
         x, y, w, h = rect
@@ -288,11 +339,14 @@ class LiveSession:
             control.stop()
             return
         buf = frame.frame_buffer
-        if self.frame_size != buf.shape[:2]:
-            self.frame_size, self.client = buf.shape[:2], client_area(self.hwnd)
-        cx, cy, cw, ch = self.client
-        buf = buf[cy:cy + ch, cx:cx + cw]
-        rect = self.area.update(buf)
+        if self.monitor:
+            rect = (0, 0, buf.shape[1], buf.shape[0])   # everything on the screen
+        else:
+            if self.frame_size != buf.shape[:2]:
+                self.frame_size, self.client = buf.shape[:2], client_area(self.hwnd)
+            cx, cy, cw, ch = self.client
+            buf = buf[cy:cy + ch, cx:cx + cw]
+            rect = self.area.update(buf)
         if rect is None:
             return  # still looking for the video area
         with self.lock:
@@ -302,7 +356,10 @@ class LiveSession:
             x, y, w, h = rect
             crop = np.ascontiguousarray(buf[y:y + h, x:x + w])  # copy: the capture buffer is reused
             if rect not in self.native:
-                if self.source_width:
+                if self.monitor:
+                    # a screen is drawn at its own resolution; only an explicit choice lowers it
+                    self.native[rect] = round(h * self.source_width / w) if self.source_width and self.source_width < w else None
+                elif self.source_width:
                     # chosen by the user: the picture's real width, scaled to this area's height
                     self.native[rect] = round(h * self.source_width / w) if self.source_width < w else None
                 else:
@@ -313,7 +370,19 @@ class LiveSession:
                     self.out.close()
                 place = self.placement(rect) if self.overlay else None
                 native_h = self.native[rect] if isinstance(self.native[rect], int) else None
-                self.out = Output(w, h, self.target, self.max_input, self.fps, place, native_h)
+                exclude, geometry = False, None
+                if self.monitor:
+                    if self.overlay:
+                        exclude = True   # lies on the captured screen: must not capture itself
+                    else:
+                        others = [m for m in monitors() if m["handle"] != self.monitor["handle"]]
+                        if others:       # fill another monitor, visible to OBS
+                            o = others[0]
+                            geometry = (o["x"], o["y"], o["w"], o["h"])
+                        else:            # only one screen: hide it from capture (OBS can't see it then)
+                            exclude = True
+                max_input = 10 ** 6 if self.monitor else self.max_input
+                self.out = Output(w, h, self.target, max_input, self.fps, place, native_h, exclude, geometry)
                 self.rect, self.latest, self.native_changed = rect, None, False
                 self.on_status(self.out.info)
             self.latest = crop
@@ -343,7 +412,11 @@ class LiveSession:
         if self.control is not None:
             try:
                 self.control.stop()
-                self.control.wait()
+                # wait() can block forever when the captured window is already gone
+                for _ in range(40):
+                    if self.control.is_finished():
+                        break
+                    time.sleep(0.05)
             except Exception:
                 pass  # already finished
 
@@ -352,19 +425,36 @@ class LiveSession:
 
 
 def main():
+    """Runs one session. The tray starts this as a child process (one per session), so a
+    capture that hangs inside Windows can never freeze the tray: it just kills the process.
+    Status lines go to stdout as 'STATUS: ...'."""
     ap = argparse.ArgumentParser()
-    ap.add_argument("window")
+    ap.add_argument("window", nargs="?", help="part of the window title")
+    ap.add_argument("--hwnd", type=int, help="window handle (instead of a title)")
+    ap.add_argument("--monitor", type=int, help="capture this whole screen (1-based) instead of a window")
     ap.add_argument("--target", type=int, default=None, help="output height (default: screen height)")
     ap.add_argument("--max-input", type=int, default=720, help="downscale captures taller than this before upscaling")
+    ap.add_argument("--source-width", type=int, default=None, help="real video width if known (854 = 480p...)")
     ap.add_argument("--overlay", action="store_true", help="show the result over the original video")
     ap.add_argument("--seconds", type=float, default=0, help="stop after this many seconds (0 = until closed)")
     args = ap.parse_args()
-    wins = find_window(args.window)
-    if not wins:
-        sys.exit(f"no window with '{args.window}' in the title")
-    hwnd, title = wins[0]
-    print(f"source window: {title!r}")
-    session = LiveSession(hwnd, args.target, args.overlay, args.max_input)
+
+    def status(text):
+        print("STATUS: " + text, flush=True)
+
+    monitor = None
+    hwnd = args.hwnd
+    if args.monitor:
+        monitor = next((m for m in monitors() if m["index"] == args.monitor), None)
+        if monitor is None:
+            sys.exit(f"no screen {args.monitor}")
+    elif hwnd is None:
+        wins = find_window(args.window or "")
+        if not args.window or not wins:
+            sys.exit(f"no window with '{args.window}' in the title")
+        hwnd = wins[0][0]
+    session = LiveSession(hwnd, args.target, args.overlay, args.max_input, on_status=status,
+                          source_width=args.source_width, monitor=monitor)
     session.start()
     t0 = time.time()
     try:
@@ -372,8 +462,9 @@ def main():
             time.sleep(0.2)
     except KeyboardInterrupt:
         pass
-    session.close()
-    print(f"done: {session.frames} frames in {time.time() - t0:.1f}s")
+    session.stop()
+    status(f"ended: {session.frames} frames in {time.time() - t0:.1f}s")
+    os._exit(0)   # don't wait for capture threads that may never finish
 
 
 if __name__ == "__main__":

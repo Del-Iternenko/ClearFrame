@@ -23,18 +23,21 @@ video ──► decode (NVDEC) ──► deblock / deband ──► neural 2× u
 
 ## ClearFrame Live — upscale any video that is already playing
 
-A tray app for viewers, streamers and film critics: YouTube in a browser, a movie in any player, a streaming site — ClearFrame captures that window (Windows Graphics Capture), finds the video area by itself, and shows it through RTX Video Super Resolution:
+A tray app for viewers, streamers and film critics: YouTube in a browser, a movie in any player, a streaming site.
 
-- **over the original video** (also fullscreen) — click-through, nothing else changes;
-- **or in a separate window** — add it to OBS as *Window Capture* for streaming.
+- **Auto (on by default):** put a video fullscreen and ClearFrame upscales it right over the original by itself; leave fullscreen and it turns off.
+- **Pick what to upscale, like screen sharing in Discord:** a whole **screen** (everything visible on it) or one **window** (ClearFrame finds the video area in it by itself).
+- **Show it** over the original (click-through, also fullscreen) **or in a separate window** — add that one to OBS as *Window Capture* for streaming. With a whole screen captured, the separate window opens on another monitor so it doesn't capture itself.
+- **Hotkeys:** Ctrl+Alt+U — the active window, Ctrl+Alt+S — the whole screen it's on; again to stop.
+- *Source quality* (Auto / 360p / 480p / 720p / 1080p) tells ClearFrame the real resolution of what you watch, so the network works on real pixels rather than on the browser's stretched copy.
 
-Press **Ctrl+Alt+U** on a window with video to turn it on or off, or pick a window from the tray menu. *Source quality* (Auto / 360p / 480p / 720p / 1080p) tells ClearFrame the real resolution of what you watch, so the network works on real pixels rather than on the browser's stretched copy.
+How it works: Windows Graphics Capture of the window or screen → video area from persistent motion → frames fed at a steady 60 fps into mpv with RTX Video Super Resolution and deband → a window ClearFrame owns (click-through, topmost, excluded from screen capture when it lies on a captured screen). Each session runs in its own process, so a capture that hangs inside Windows can't freeze the tray. Diagnostics: `%APPDATA%\ClearFrame\live.log`.
 
 ```
 ClearFrame-Live.bat          # needs .venv (see engine/README.md) and: python bench/bench.py setup
 ```
 
-Limits: DRM-protected services (Netflix and similar) give a black picture to every capture tool, OBS included. Audio stays with the original app.
+Limits: DRM-protected services (Netflix and similar) give a black picture to every capture tool, OBS included. Games or players in *exclusive* fullscreen can't have anything drawn over them (browsers and most players use borderless fullscreen, which works). Audio stays with the original app.
 
 ## Try the file player (early preview)
 
