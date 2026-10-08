@@ -84,7 +84,7 @@ def tool(name):
 
 def open_url(url):
     # some hosts reject Python's default User-Agent
-    req = urllib.request.Request(url, headers={"User-Agent": "ClearFrame-bench/0.1 (+https://github.com/khaperskii3-png/ClearFrame)"})
+    req = urllib.request.Request(url, headers={"User-Agent": "ClearFrame-bench/0.1 (+https://github.com/Del-Iternenko/ClearFrame)"})
     return urllib.request.urlopen(req)
 
 
