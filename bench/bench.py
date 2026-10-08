@@ -228,6 +228,87 @@ def metrics(variant):
     return (float(psnr.group(1)) if psnr else None, float(ssim.group(1)) if ssim else None)
 
 
+ZOOM_W, ZOOM_H, ZOOM = 480, 270, 2   # region size in reference pixels, magnification
+
+
+def pick_regions(count=2):
+    """The most detailed ZOOM_W x ZOOM_H areas of the clip (edges, text, texture),
+    measured on the clean reference, so every zoom video shows the same places."""
+    k = 4  # analyse at 1/4 size
+    w, h, rw, rh = REF_W // k, REF_H // k, ZOOM_W // k, ZOOM_H // k
+    energy = [[0.0] * w for _ in range(h)]
+    for t in (2, 6, 10, 14, 18):
+        raw = subprocess.run([str(tool("ffmpeg")), "-v", "error", "-ss", str(t), "-i", str(REFERENCE), "-frames:v", "1",
+                              "-vf", f"scale={w}:{h}:flags=area,format=gray", "-f", "rawvideo", "-"],
+                             check=True, capture_output=True).stdout
+        for y in range(1, h):
+            row, up = raw[y * w:(y + 1) * w], raw[(y - 1) * w:y * w]
+            for x in range(1, w):
+                energy[y][x] += abs(row[x] - row[x - 1]) + abs(row[x] - up[x])
+    # summed-area table -> energy of every window in O(1)
+    sat = [[0.0] * (w + 1) for _ in range(h + 1)]
+    for y in range(h):
+        acc = 0.0
+        for x in range(w):
+            acc += energy[y][x]
+            sat[y + 1][x + 1] = sat[y][x + 1] + acc
+    scored = []
+    for y in range(0, h - rh + 1, 2):
+        for x in range(0, w - rw + 1, 2):
+            s = sat[y + rh][x + rw] - sat[y][x + rw] - sat[y + rh][x] + sat[y][x]
+            scored.append((s, x, y))
+    scored.sort(reverse=True)
+    picked = []
+    for s, x, y in scored:
+        if all(abs(x - px) >= rw or abs(y - py) >= rh for px, py in picked):
+            picked.append((x, y))
+            if len(picked) == count:
+                break
+    return [(x * k, y * k) for x, y in picked]
+
+
+def zoom_videos(ready, label):
+    """Same regions, same moments, every variant:
+    zoom/<variant>.mp4            - the regions of one variant (flip between files to compare)
+    zoom/bicubic-vs-<variant>.mp4 - unprocessed (bicubic) left, processed right
+    zoom/regions.png              - where the regions are in the frame"""
+    ff = tool("ffmpeg")
+    zdir = OUT / "zoom"
+    zdir.mkdir(exist_ok=True)
+    regions = pick_regions()
+    log(f"zoom regions (x, y): {regions}")
+    small = lambda text: label(text).replace("fontsize=40", "fontsize=28").replace("x=24:y=24", "x=14:y=14")
+    sources = {"original": (REFERENCE, "Original"), "source": (SOURCE, "Source (pixels as delivered)"),
+               **{n: (p, LABELS[n]) for n, p in ready.items()}}
+    encode = ["-c:v", "libx264", "-crf", "12", "-preset", "slow", "-pix_fmt", "yuv420p"]
+
+    def panels(index, name, text):
+        pre = f"[{index}:v]" + (f"scale={REF_W}:{REF_H}:flags=neighbor," if sources[name][0] == SOURCE else "")
+        chains = [f"{pre}split={len(regions)}" + "".join(f"[{name}{i}in]" for i in range(len(regions)))]
+        for i, (x, y) in enumerate(regions):
+            chains.append(f"[{name}{i}in]crop={ZOOM_W}:{ZOOM_H}:{x}:{y},"
+                          f"scale={ZOOM_W * ZOOM}:{ZOOM_H * ZOOM}:flags=neighbor,{small(text)}[{name}{i}]")
+        return chains
+
+    for name, (path, text) in sources.items():
+        rows = "".join(f"[{name}{i}]" for i in range(len(regions)))
+        run([ff, "-hide_banner", "-y", "-i", path, "-filter_complex",
+             ";".join(panels(0, name, text)) + f";{rows}vstack=inputs={len(regions)}[v]",
+             "-map", "[v]", *encode, zdir / f"{name}.mp4"])
+    for name in ready:
+        if name == "bicubic":
+            continue
+        chains = panels(0, "bicubic", LABELS["bicubic"]) + panels(1, name, LABELS[name])
+        chains += [f"[bicubic{i}][{name}{i}]hstack[row{i}]" for i in range(len(regions))]
+        rows = "".join(f"[row{i}]" for i in range(len(regions)))
+        run([ff, "-hide_banner", "-y", "-i", ready["bicubic"], "-i", ready[name], "-filter_complex",
+             ";".join(chains) + f";{rows}vstack=inputs={len(regions)}[v]", "-map", "[v]", *encode,
+             zdir / f"bicubic-vs-{name}.mp4"])
+    boxes = ",".join(f"drawbox=x={x}:y={y}:w={ZOOM_W}:h={ZOOM_H}:color=0x76b900:t=6" for x, y in regions)
+    run([ff, "-hide_banner", "-y", "-ss", "10", "-i", REFERENCE, "-vf", boxes, "-frames:v", "1", zdir / "regions.png"])
+    return regions
+
+
 def compare():
     ff = tool("ffmpeg")
     ready = {k: v for k, v in VARIANTS.items() if v.exists()}
@@ -269,13 +350,17 @@ def compare():
         run([ff, "-hide_banner", "-y", *args, "-filter_complex",
              ";".join(chains) + f";{stack}hstack=inputs={len(inputs)}[v]",
              "-map", "[v]", "-frames:v", "1", OUT / f"crop-{t:02d}s.png"])
+    regions = zoom_videos(ready, label)
 
     lines = ["# Bench results", "",
              f"Clip: Tears of Steel {CLIP_START}s+{CLIP_SECONDS}s, reference {REF_W}x{REF_H}, "
              f"source {SRC_W}x{SRC_H} H.264 {SRC_BITRATE}bit/s, upscale x{SCALE}.", "",
              "| Variant | PSNR (dB) | SSIM |", "|---|---|---|"]
     lines += [f"| {LABELS[n]} | {p:.2f} | {s:.4f} |" for n, p, s in rows]
-    lines += ["", "Higher is closer to the clean original. Metrics don't capture everything - watch the split-screen video and crops."]
+    lines += ["", "Higher is closer to the clean original. Metrics don't capture everything - watch the videos.", "",
+              f"Zoom videos (`zoom/`): the same {len(regions)} most detailed {ZOOM_W}x{ZOOM_H} regions "
+              f"{regions}, magnified {ZOOM}x, in every variant - `zoom/<variant>.mp4` to flip between, "
+              "`zoom/bicubic-vs-<variant>.mp4` side by side, `zoom/regions.png` shows where they are."]
     (OUT / "results.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     log(f"done -> {OUT / 'results.md'}")
 

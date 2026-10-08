@@ -21,6 +21,16 @@ Close-up (left to right: original, source, bicubic, RTX VSR):
 
 **Takeaway:** on a heavily compressed source, driver RTX VSR is visually almost identical to bicubic and slightly *further* from the original by PSNR/SSIM. It smooths, but does not restore detail or text. This matches what our first tester saw on real web video and is the baseline ClearFrame has to beat.
 
+### Zoom videos
+
+The bench now picks the most detailed regions automatically and renders the same regions for every variant (see [bench/README.md](../bench/README.md)). Regions for this clip:
+
+![regions](img/bench-v1-zoom-regions.png)
+
+Frame from `zoom/bicubic-vs-rtx-vsr.mp4` (bicubic left, RTX VSR right):
+
+![side by side](img/bench-v1-zoom-side-by-side.png)
+
 ### Preview: what a heavy neural model can do (not real-time)
 
 Same frame (t = 10 s), same 3x zoom. Real-ESRGAN models run through `realesrgan-ncnn-vulkan` v0.2.5.0 (Vulkan, not Tensor Cores), x4 output resized to 1920x800.
