@@ -23,18 +23,21 @@ video ──► decode (NVDEC) ──► deblock / deband ──► neural 2× u
 
 ## ClearFrame Live — upscale any video that is already playing
 
-A tray app for viewers, streamers and film critics: YouTube in a browser, a movie in any player, a streaming site.
+A desktop app for viewers, streamers and film critics: YouTube in a browser, a movie in any player, a streaming site. It lives in the tray and has a settings window in 8 languages — English, 中文, हिन्दी, Español, العربية, Français, বাংলা, Русский — with dark/light themes and accent colors.
 
-- **Auto (on by default):** put a video fullscreen and ClearFrame upscales it right over the original by itself; leave fullscreen and it turns off.
+- **Auto (on by default):** put a video fullscreen and ClearFrame upscales it right over the original by itself; leave fullscreen and it turns off. Start delay and an allow/deny list of apps are configurable.
 - **Pick what to upscale, like screen sharing in Discord:** a whole **screen** (everything visible on it) or one **window** (ClearFrame finds the video area in it by itself).
 - **Show it** over the original (click-through, also fullscreen) **or in a separate window** — add that one to OBS as *Window Capture* for streaming. With a whole screen captured, the separate window opens on another monitor so it doesn't capture itself.
-- **Hotkeys:** Ctrl+Alt+U — the active window, Ctrl+Alt+S — the whole screen it's on; again to stop.
-- *Source quality* (Auto / 360p / 480p / 720p / 1080p) tells ClearFrame the real resolution of what you watch, so the network works on real pixels rather than on the browser's stretched copy.
+- **Hotkeys (rebindable):** Ctrl+Alt+U — the active window, Ctrl+Alt+S — the whole screen it's on, Ctrl+Alt+A — auto mode, Ctrl+Alt+C — compare with the original.
+- **Tuning:** source quality (Auto / 360p … 1080p — the real resolution of what you watch, so the network works on real pixels rather than on the browser's stretched copy), deband strength and grain, frame rate, pause on battery. Changes apply to a running session at once.
+- **System:** start with Windows, start minimized, close to tray, notifications.
 
-How it works: Windows Graphics Capture of the window or screen → video area from persistent motion → frames fed at a steady 60 fps into mpv with RTX Video Super Resolution and deband → a window ClearFrame owns (click-through, topmost, excluded from screen capture when it lies on a captured screen). Each session runs in its own process, so a capture that hangs inside Windows can't freeze the tray. Diagnostics: `%APPDATA%\ClearFrame\live.log`.
+How it works: Windows Graphics Capture of the window or screen → video area from persistent motion → frames fed at a steady rate into mpv with RTX Video Super Resolution and deband → a window ClearFrame owns (click-through, topmost, excluded from screen capture when it lies on a captured screen). Each session runs in its own process, so a capture that hangs inside Windows can't freeze the app. The UI is plain HTML/CSS in WebView2 (pywebview), with the Inter font and Lucide icons. Settings: `%APPDATA%\ClearFrame\settings.json`, diagnostics: `%APPDATA%\ClearFrame\clearframe.log`.
 
 ```
-ClearFrame-Live.bat          # needs .venv (see engine/README.md) and: python bench/bench.py setup
+pip install -r desktop/requirements.txt   # into .venv (see engine/README.md)
+python bench/bench.py setup               # once: pinned mpv + ffmpeg into vendor/
+ClearFrame-Live.bat                       # or: pythonw desktop/main.py [--minimized]
 ```
 
 Limits: DRM-protected services (Netflix and similar) give a black picture to every capture tool, OBS included. Games or players in *exclusive* fullscreen can't have anything drawn over them (browsers and most players use borderless fullscreen, which works). Audio stays with the original app.

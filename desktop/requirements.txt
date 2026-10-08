@@ -1,0 +1,6 @@
+# ClearFrame desktop app (Windows, Python 3.12+)
+pywebview==6.2.1      # WebView2 window for the UI (pulls pythonnet)
+pystray==0.19.5       # tray icon
+pillow==12.3.0        # tray icon drawing
+windows-capture==2.0.1
+numpy==2.5.3

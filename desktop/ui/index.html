@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClearFrame</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="titlebar">
+    <div class="brand pywebview-drag-region"><span class="logo" data-icon="play"></span><span>ClearFrame</span><span class="ver" id="ver"></span></div>
+    <div class="drag pywebview-drag-region"></div>
+    <div class="winbtns">
+      <button id="btn-min" aria-label="Minimize" data-icon="minus"></button>
+      <button id="btn-max" aria-label="Maximize" data-icon="square"></button>
+      <button id="btn-close" class="close" aria-label="Close" data-icon="x"></button>
+    </div>
+  </header>
+  <div class="shell">
+    <nav id="nav" aria-label="Sections"></nav>
+    <main id="main" tabindex="-1"></main>
+  </div>
+  <div id="layer"></div>
+  <script src="icons.js"></script>
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

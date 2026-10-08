@@ -65,6 +65,10 @@ def list_windows():
             return True
         if user32.GetWindowLongW(hwnd, -20) & 0x80:  # WS_EX_TOOLWINDOW
             return True
+        cloaked = ctypes.c_int(0)  # DWMWA_CLOAKED: suspended UWP/background shells (TextInputHost etc.)
+        ctypes.windll.dwmapi.DwmGetWindowAttribute(ctypes.c_void_p(hwnd), 14, ctypes.byref(cloaked), 4)
+        if cloaked.value:
+            return True
         title = window_title(hwnd)
         if not title or title.startswith("ClearFrame"):
             return True
@@ -209,7 +213,10 @@ class Output:
     neither: a normal window sized for the target height (capture it in OBS).
     exclude: hide the window from screen capture (when it lies on a captured screen)."""
 
-    def __init__(self, w, h, target, max_input, fps, place=None, native_h=None, exclude=False, geometry=None):
+    def __init__(self, w, h, target, max_input, fps, place=None, native_h=None, exclude=False, geometry=None,
+                 tuning=None):
+        """tuning: engine ('rtx_driver' or 'none'), deband (bool), deband_strength, deband_grain."""
+        t = {"engine": "rtx_driver", "deband": True, "deband_strength": 48, "deband_grain": 16, **(tuning or {})}
         self.w, self.h = w, h
         # players and browsers already upscaled the video to the window: bring it back
         # to its real size (detected, see native_res) so the network sees real pixels;
@@ -231,14 +238,19 @@ class Output:
             fit = min(1.0, 0.9 * user32.GetSystemMetrics(0) / out_w, 0.9 * user32.GetSystemMetrics(1) / out_h)
             self.host = HostWindow("ClearFrame Output", 100, 100, int(out_w * fit), int(out_h * fit),
                                    exclude_from_capture=exclude)
-        vf = (f"scale={in_w}:{in_h}:flags=area,format=nv12,"
-              f"d3d11vpp=scale={scale:.3f}:scaling-mode=nvidia")
+        if t["engine"] == "none":   # plain scaling, for comparison or non-RTX GPUs
+            vf = f"scale={in_w}:{in_h}:flags=area"
+        else:
+            vf = (f"scale={in_w}:{in_h}:flags=area,format=nv12,"
+                  f"d3d11vpp=scale={scale:.3f}:scaling-mode=nvidia")
+        deband = ([f"--deband=yes", "--deband-iterations=4", f"--deband-threshold={int(t['deband_strength'])}",
+                   f"--deband-grain={int(t['deband_grain'])}"] if t["deband"] else ["--deband=no"])
         args = [str(MPV), "--no-config", "--demuxer=rawvideo", f"--demuxer-rawvideo-w={w}", f"--demuxer-rawvideo-h={h}",
                 "--demuxer-rawvideo-mp-format=bgra", f"--demuxer-rawvideo-fps={fps}",
                 # frames arrive already paced (see LiveSession.pump): show each one at once, buffer nothing
                 "--untimed", "--no-cache", "--demuxer-readahead-secs=0", "--demuxer-max-bytes=1MiB",
                 "--gpu-api=d3d11", "--d3d11-adapter=NVIDIA", "--vo=gpu-next", f"--vf={vf}",
-                "--deband=yes", "--deband-iterations=4", "--deband-threshold=48", "--deband-grain=16",
+                *deband,
                 f"--wid={self.host.hwnd}", "--no-input-default-bindings", "--input-cursor=no", "--cursor-autohide=no",
                 "--keep-open=no", "--osd-level=0", "--really-quiet",
                 "--log-file=" + str(ROOT / "live" / "output-mpv.log")]
@@ -273,12 +285,13 @@ class LiveSession:
     """Capture one window (and find its video area) or a whole screen, upscale it into an Output."""
 
     def __init__(self, hwnd=None, target=None, overlay=False, max_input=720, fps=60, on_status=print,
-                 source_width=None, monitor=None):
+                 source_width=None, monitor=None, tuning=None):
         """source_width: real width of the video if known (854 = 480p, 1280 = 720p...);
         None = detect it automatically (experimental). monitor: a monitors() entry to
         capture the whole screen instead of one window."""
         self.source_width = source_width
         self.monitor = monitor
+        self.tuning = tuning
         self.hwnd, self.overlay, self.max_input, self.fps = hwnd, overlay, max_input, fps
         self.target = target or user32.GetSystemMetrics(1)
         self.on_status = on_status
@@ -382,7 +395,7 @@ class LiveSession:
                         else:            # only one screen: hide it from capture (OBS can't see it then)
                             exclude = True
                 max_input = 10 ** 6 if self.monitor else self.max_input
-                self.out = Output(w, h, self.target, max_input, self.fps, place, native_h, exclude, geometry)
+                self.out = Output(w, h, self.target, max_input, self.fps, place, native_h, exclude, geometry, self.tuning)
                 self.rect, self.latest, self.native_changed = rect, None, False
                 self.on_status(self.out.info)
             self.latest = crop
@@ -423,6 +436,12 @@ class LiveSession:
     def running(self):
         return not self.stopped.is_set()
 
+    def set_visible(self, visible):
+        """Hide the output for a moment to see the original (compare)."""
+        out = self.out
+        if out is not None and out.host.hwnd:
+            user32.ShowWindow(ctypes.c_void_p(out.host.hwnd), 8 if visible else 0)  # SW_SHOWNA / SW_HIDE
+
 
 def main():
     """Runs one session. The tray starts this as a child process (one per session), so a
@@ -436,6 +455,11 @@ def main():
     ap.add_argument("--max-input", type=int, default=720, help="downscale captures taller than this before upscaling")
     ap.add_argument("--source-width", type=int, default=None, help="real video width if known (854 = 480p...)")
     ap.add_argument("--overlay", action="store_true", help="show the result over the original video")
+    ap.add_argument("--engine", default="rtx_driver", choices=["rtx_driver", "none"])
+    ap.add_argument("--fps", type=int, default=60, help="output pacing")
+    ap.add_argument("--no-deband", action="store_true")
+    ap.add_argument("--deband-strength", type=int, default=48)
+    ap.add_argument("--deband-grain", type=int, default=16)
     ap.add_argument("--seconds", type=float, default=0, help="stop after this many seconds (0 = until closed)")
     args = ap.parse_args()
 
@@ -453,9 +477,23 @@ def main():
         if not args.window or not wins:
             sys.exit(f"no window with '{args.window}' in the title")
         hwnd = wins[0][0]
-    session = LiveSession(hwnd, args.target, args.overlay, args.max_input, on_status=status,
-                          source_width=args.source_width, monitor=monitor)
+    tuning = {"engine": args.engine, "deband": not args.no_deband,
+              "deband_strength": args.deband_strength, "deband_grain": args.deband_grain}
+    session = LiveSession(hwnd, args.target, args.overlay, args.max_input, args.fps, on_status=status,
+                          source_width=args.source_width, monitor=monitor, tuning=tuning)
     session.start()
+
+    def commands():
+        """Lines from the parent on stdin: 'hide' / 'show' (compare), 'stop'."""
+        for line in sys.stdin:
+            cmd = line.strip()
+            if cmd in ("hide", "show"):
+                session.set_visible(cmd == "show")
+            elif cmd == "stop":
+                session.stop()
+                break
+
+    threading.Thread(target=commands, daemon=True).start()
     t0 = time.time()
     try:
         while session.running() and (not args.seconds or time.time() - t0 < args.seconds):
