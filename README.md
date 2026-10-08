@@ -21,7 +21,22 @@ video ──► decode (NVDEC) ──► deblock / deband ──► neural 2× u
 - **Auto profile:** picks the scale factor and model size from the source resolution and the GPU, so playback stays real-time.
 - **Browser hand-off (optional):** a browser extension sends the video you're watching to the ClearFrame player.
 
-## Try it now (early preview)
+## ClearFrame Live — upscale any video that is already playing
+
+A tray app for viewers, streamers and film critics: YouTube in a browser, a movie in any player, a streaming site — ClearFrame captures that window (Windows Graphics Capture), finds the video area by itself, and shows it through RTX Video Super Resolution:
+
+- **over the original video** (also fullscreen) — click-through, nothing else changes;
+- **or in a separate window** — add it to OBS as *Window Capture* for streaming.
+
+Press **Ctrl+Alt+U** on a window with video to turn it on or off, or pick a window from the tray menu. *Source quality* (Auto / 360p / 480p / 720p / 1080p) tells ClearFrame the real resolution of what you watch, so the network works on real pixels rather than on the browser's stretched copy.
+
+```
+ClearFrame-Live.bat          # needs .venv (see engine/README.md) and: python bench/bench.py setup
+```
+
+Limits: DRM-protected services (Netflix and similar) give a black picture to every capture tool, OBS included. Audio stays with the original app.
+
+## Try the file player (early preview)
 
 A control panel that plays a video and switches upscaling on and off while it plays:
 
