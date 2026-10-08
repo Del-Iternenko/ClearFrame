@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from controller import LOG, Controller, log  # noqa: E402
+from controller import AVAILABLE, LOG, Controller, log  # noqa: E402
 from settings import LANGUAGES, Settings  # noqa: E402
 
 APP_NAME = "ClearFrame"
@@ -64,7 +64,7 @@ class Api:
         s = self._app.settings
         return {"settings": s.all(), "schema": s.schema(), "state": self._app.controller.state(),
                 "system_language": system_language(), "version": VERSION, "repo": REPO,
-                "languages": LANGUAGES, "log_path": str(LOG)}
+                "languages": LANGUAGES, "log_path": str(LOG), "engines": AVAILABLE}
 
     def state(self):
         return self._app.controller.state()

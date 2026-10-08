@@ -28,12 +28,12 @@ SCHEMA = {
     # mode / capture / output
     "auto_fullscreen": (True, bool),
     "auto_delay": (1.0, (0.5, 5.0)),
-    "auto_apps_mode": ("all", ["all", "only", "except"]),
+    "auto_apps_mode": ("video", ["video", "all", "only", "except"]),   # video: browsers + players (+ auto_apps)
     "auto_apps": ([], "list"),
     "output": ("overlay", ["overlay", "window"]),
     "window_height": (1440, [1080, 1440, 2160]),
     # upscaling
-    "engine": ("rtx_driver", ["rtx_driver", "nvvfx", "clearframe", "none"]),
+    "engine": ("clearframe", ["clearframe", "nvvfx", "rtx_driver", "none"]),
     "quality": ("high", ["low", "medium", "high", "ultra"]),
     "artifact_reduction": ("strong", ["off", "light", "strong"]),
     "source": ("auto", ["auto", "360p", "480p", "720p", "1080p"]),

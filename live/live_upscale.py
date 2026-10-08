@@ -217,7 +217,8 @@ class Output:
 
     def __init__(self, w, h, target, max_input, fps, place=None, native_h=None, exclude=False, geometry=None,
                  tuning=None):
-        """tuning: engine ('rtx_driver' or 'none'), deband (bool), deband_strength, deband_grain."""
+        """tuning: engine ('neural', 'nvvfx', 'rtx_driver' or 'none'), quality, artifact_reduction (nvvfx),
+        deband (bool), deband_strength, deband_grain."""
         t = {"engine": "rtx_driver", "deband": True, "deband_strength": 48, "deband_grain": 16, **(tuning or {})}
         self.w, self.h = w, h
         # players and browsers already upscaled the video to the window: bring it back
@@ -240,31 +241,49 @@ class Output:
             fit = min(1.0, 0.9 * user32.GetSystemMetrics(0) / out_w, 0.9 * user32.GetSystemMetrics(1) / out_h)
             self.host = HostWindow("ClearFrame Output", 100, 100, int(out_w * fit), int(out_h * fit),
                                    exclude_from_capture=exclude)
-        if t["engine"] == "none":   # plain scaling, for comparison or non-RTX GPUs
+        self.stage = None
+        fmt, feed_w, feed_h = "bgra", w, h
+        if t["engine"] in ("neural", "nvvfx"):
+            # the network runs here, on the GPU (gpu_stage); mpv only fits its output to the window
+            from gpu_stage import GpuStage
+            self.stage = GpuStage(t["engine"], in_w, in_h, out_w, out_h, t)
+            fmt, feed_w, feed_h = "rgb24", self.stage.out_w, self.stage.out_h
+            vf = ""
+        elif t["engine"] == "none":   # plain scaling, for comparison or non-RTX GPUs
             vf = f"scale={in_w}:{in_h}:flags=area"
         else:
             vf = (f"scale={in_w}:{in_h}:flags=area,format=nv12,"
                   f"d3d11vpp=scale={scale:.3f}:scaling-mode=nvidia")
         deband = ([f"--deband=yes", "--deband-iterations=4", f"--deband-threshold={int(t['deband_strength'])}",
                    f"--deband-grain={int(t['deband_grain'])}"] if t["deband"] else ["--deband=no"])
-        args = [str(MPV), "--no-config", "--demuxer=rawvideo", f"--demuxer-rawvideo-w={w}", f"--demuxer-rawvideo-h={h}",
-                "--demuxer-rawvideo-mp-format=bgra", f"--demuxer-rawvideo-fps={fps}",
+        args = [str(MPV), "--no-config", "--demuxer=rawvideo", f"--demuxer-rawvideo-w={feed_w}",
+                f"--demuxer-rawvideo-h={feed_h}", f"--demuxer-rawvideo-mp-format={fmt}", f"--demuxer-rawvideo-fps={fps}",
                 # frames arrive already paced (see LiveSession.pump): show each one at once, buffer nothing
                 "--untimed", "--no-cache", "--demuxer-readahead-secs=0", "--demuxer-max-bytes=1MiB",
                 "--gpu-api=d3d11", "--d3d11-adapter=NVIDIA", "--vo=gpu-next", f"--vf={vf}",
+                "--scale=ewa_lanczossharp", "--dscale=mitchell",
                 *deband,
                 f"--wid={self.host.hwnd}", "--no-input-default-bindings", "--input-cursor=no", "--cursor-autohide=no",
                 "--keep-open=no", "--osd-level=0", "--really-quiet",
                 "--log-file=" + str(ROOT / "live" / "output-mpv.log")]
         self.proc = subprocess.Popen(args + ["-"], stdin=subprocess.PIPE, cwd=str(MPV.parent))
         source = f"real {in_w}x{in_h}" if native_h else f"{in_w}x{in_h}"
-        self.info = f"on screen {w}x{h} -> {source} -> RTX VSR x{scale:.2f} -> {out_w}x{out_h}"
+        if self.stage:
+            self.info = f"on screen {w}x{h} -> {source} -> {self.stage.label} -> {self.stage.out_w}x{self.stage.out_h}"
+        else:
+            name = "no upscaling" if t["engine"] == "none" else f"RTX VSR x{scale:.2f}"
+            self.info = f"on screen {w}x{h} -> {source} -> {name} -> {out_w}x{out_h}"
 
     def window(self):
         return self.host.hwnd
 
     def write(self, bgra):
         try:
+            if self.stage:
+                self.stage.submit(bgra)
+                if self.stage.result is not None:
+                    self.proc.stdin.write(self.stage.result)
+                return True
             self.proc.stdin.write(np.ascontiguousarray(bgra).data)
             return True
         except (BrokenPipeError, OSError, ValueError):
@@ -280,6 +299,8 @@ class Output:
         except OSError:
             pass
         self.proc.terminate()
+        if self.stage:
+            self.stage.close()
         self.host.close()
 
 
@@ -457,7 +478,9 @@ def main(argv=None):
     ap.add_argument("--max-input", type=int, default=720, help="downscale captures taller than this before upscaling")
     ap.add_argument("--source-width", type=int, default=None, help="real video width if known (854 = 480p...)")
     ap.add_argument("--overlay", action="store_true", help="show the result over the original video")
-    ap.add_argument("--engine", default="rtx_driver", choices=["rtx_driver", "none"])
+    ap.add_argument("--engine", default="rtx_driver", choices=["neural", "nvvfx", "rtx_driver", "none"])
+    ap.add_argument("--quality", default="high", choices=["low", "medium", "high", "ultra"], help="nvvfx")
+    ap.add_argument("--artifact-reduction", default="strong", choices=["off", "light", "strong"], help="nvvfx")
     ap.add_argument("--fps", type=int, default=60, help="output pacing")
     ap.add_argument("--no-deband", action="store_true")
     ap.add_argument("--deband-strength", type=int, default=48)
@@ -479,8 +502,13 @@ def main(argv=None):
         if not args.window or not wins:
             sys.exit(f"no window with '{args.window}' in the title")
         hwnd = wins[0][0]
+    if args.engine == "neural":
+        status("loading the neural network (the first time it is prepared for your GPU, about a minute)...")
+        import gpu_stage
+        gpu_stage.prepare()
     tuning = {"engine": args.engine, "deband": not args.no_deband,
-              "deband_strength": args.deband_strength, "deband_grain": args.deband_grain}
+              "deband_strength": args.deband_strength, "deband_grain": args.deband_grain,
+              "quality": args.quality, "artifact_reduction": args.artifact_reduction}
     session = LiveSession(hwnd, args.target, args.overlay, args.max_input, args.fps, on_status=status,
                           source_width=args.source_width, monitor=monitor, tuning=tuning)
     session.start()
@@ -503,7 +531,11 @@ def main(argv=None):
     except KeyboardInterrupt:
         pass
     session.stop()
-    status(f"ended: {session.frames} frames in {time.time() - t0:.1f}s")
+    secs = time.time() - t0
+    gpu = sys.modules.get("gpu_stage")
+    net = (f", network: {gpu.stats['frames']} new frames ({gpu.stats['frames'] / secs:.1f}/s), "
+           f"{gpu.stats['ms']:.1f} ms each") if gpu and gpu.stats["frames"] else ""
+    status(f"ended: {session.frames} frames in {secs:.1f}s{net}")
     os._exit(0)   # don't wait for capture threads that may never finish
 
 

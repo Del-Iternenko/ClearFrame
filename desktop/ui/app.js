@@ -1,6 +1,6 @@
 "use strict";
 // ClearFrame UI: pages are built from small declarative helpers; every string goes through t().
-const S = { settings: {}, schema: {}, state: {}, lang: "en", page: "home", recording: null, sysLang: "en" };
+const S = { settings: {}, schema: {}, state: {}, lang: "en", page: "home", recording: null, sysLang: "en", engines: {} };
 const $ = (sel, el = document) => el.querySelector(sel);
 const api = () => window.pywebview && window.pywebview.api;
 
@@ -123,7 +123,7 @@ function pageHome() {
     h("button", { class: "btn primary", onclick: () => api().toggle_compare() }, icon("columns-2", "sm"), t(st.comparing ? "home.back" : "home.compare")),
     h("button", { class: "btn", onclick: () => api().stop() }, icon("x", "sm"), t("home.stop")),
   ] : [];
-  const SHORT = { rtx_driver: "RTX VSR", nvvfx: "NVIDIA VFX" };
+  const SHORT = { rtx_driver: "RTX VSR", nvvfx: "NVIDIA VFX", clearframe: "ClearFrame Neural" };
   const engineName = SHORT[S.settings.engine] || t("engine." + S.settings.engine);
   const modeCard = (id, ic, title, desc, active, onclick) => h("button", { class: "card mode" + (active ? " active" : ""), onclick },
     h("div", { class: "t" }, icon(ic), t(title)), h("div", { class: "d" }, t(desc)));
@@ -143,14 +143,17 @@ function pageHome() {
 }
 
 function pageUpscale() {
-  const nvvfx = S.settings.engine === "nvvfx";
-  const engines = ["rtx_driver", "nvvfx", "clearframe", "none"];
+  const nvvfx = S.settings.engine === "nvvfx" && S.engines.nvvfx;
+  const engines = ["clearframe", "nvvfx", "rtx_driver", "none"];
+  const missing = engines.filter(o => S.engines[o] === false);
+  // quality / artifact reduction are NVIDIA VFX controls: greyed with another engine, badged when VFX isn't installed
+  const vfxBadge = S.engines.nvvfx ? null : { key: "badge.sdk", cls: "warn" };
   return h("div", { class: "page" }, ...pageHead("up.title", "up.lead"),
     ...section("up.s_engine", null,
-      row({ icon: "cpu", title: "up.engine", desc: "up.engine_d", control: select("engine", engines, o => t("engine." + o) + (o === "nvvfx" || o === "clearframe" ? " · " + t("badge.soon") : ""), ["nvvfx", "clearframe"]) }),
-      row({ icon: "gauge", title: "up.quality", desc: "up.quality_d", disabled: !nvvfx, badge: nvvfx ? null : { key: "badge.sdk", cls: "warn" },
+      row({ icon: "cpu", title: "up.engine", desc: "up.engine_d", control: select("engine", engines, o => t("engine." + o) + (o === "clearframe" ? " · " + t("badge.best") : "") + (missing.includes(o) ? " · " + t("badge.missing") : ""), missing) }),
+      row({ icon: "gauge", title: "up.quality", desc: "up.quality_d", disabled: !nvvfx, badge: vfxBadge,
         control: seg("quality", ["low", "medium", "high", "ultra"], o => t("q." + o)) }),
-      row({ icon: "wand-sparkles", title: "up.ar", desc: "up.ar_d", disabled: !nvvfx, badge: nvvfx ? null : { key: "badge.sdk", cls: "warn" },
+      row({ icon: "wand-sparkles", title: "up.ar", desc: "up.ar_d", disabled: !nvvfx, badge: vfxBadge,
         control: seg("artifact_reduction", ["off", "light", "strong"], o => t("ar." + o)) }),
       row({ icon: "film", title: "up.source", desc: "up.source_d", control: seg("source", ["auto", "360p", "480p", "720p", "1080p"], o => o === "auto" ? t("src.auto") : o) })),
     ...section("up.s_clean", null,
@@ -177,14 +180,13 @@ function pageCapture() {
     ...section("cap.s_auto", null,
       row({ icon: "zap", title: "cap.auto", desc: "cap.auto_d", control: toggle("auto_fullscreen") }),
       row({ icon: "timer", title: "cap.delay", desc: "cap.delay_d", disabled: !auto, control: range("auto_delay", 0.5, 5, 0.5, v => v.toFixed(1) + " s") }),
-      row({ icon: "app-window", title: "cap.apps", desc: "cap.apps_d", disabled: !auto, control: seg("auto_apps_mode", ["all", "only", "except"], o => t("apps." + o)) }),
+      row({ icon: "app-window", title: "cap.apps", desc: "cap.apps_d", disabled: !auto, control: seg("auto_apps_mode", ["video", "all", "only", "except"], o => t("apps." + o)) }),
       appsOn && auto ? h("div", { class: "row" }, h("div", { class: "ico" }, icon("plus")), h("div", { class: "txt" }, appsEditor())) : null),
     ...section("cap.s_output", null,
       row({ icon: "cast", title: "cap.output", desc: "cap.output_d", control: seg("output", ["overlay", "window"], o => t("out." + o)) }),
       row({ icon: "maximize", title: "cap.height", desc: "cap.height_d", disabled: S.settings.output !== "window", control: seg("window_height", [1080, 1440, 2160], o => o + "p") })),
     ...section("cap.s_perf", null,
       row({ icon: "activity", title: "cap.fps", desc: "cap.fps_d", control: seg("max_fps", [30, 60, 120], o => o + " fps") }),
-      row({ icon: "copy", title: "cap.skip", desc: "cap.skip_d", disabled: true, badge: { key: "badge.soon" }, control: toggle("skip_duplicates") }),
       row({ icon: "battery-low", title: "cap.battery", desc: "cap.battery_d", control: toggle("pause_on_battery") })));
 }
 
@@ -315,7 +317,7 @@ async function boot() {
   $("#btn-max").onclick = () => api().toggle_maximize();
   $("#btn-close").onclick = () => api().close();
   const b = await api().bootstrap();
-  Object.assign(S, { settings: b.settings, schema: b.schema, state: b.state, sysLang: b.system_language, version: b.version });
+  Object.assign(S, { settings: b.settings, schema: b.schema, state: b.state, sysLang: b.system_language, version: b.version, engines: b.engines || {} });
   $("#ver").textContent = "v" + b.version;
   applyLook(); render();
   matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => S.settings.theme === "system" && applyLook());

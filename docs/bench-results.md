@@ -46,3 +46,23 @@ Next: neural models through TensorRT (roadmap part 2) and a harder 3x source (64
 
 ---
 Footage: "Tears of Steel" (CC BY 3.0) (c) Blender Foundation | mango.blender.org
+
+## v2 — neural engines (2026-10-09)
+
+Same clip and source. New variants: NVIDIA Video Effects SDK *VideoSuperRes* (`pip install nvidia-vfx`, HIGH and ULTRA) and **2xLiveActionV1_SPAN** by jcj83429 (CC-BY-NC-SA-4.0) — a SPAN network trained on live action with JPEG / MPEG-4 / H.264 / VP9 / H.265 compression, chroma subsampling, rescaling blur and halos. `python bench/bench.py vfx`, `python bench/bench.py liveaction-span`.
+
+| Variant | PSNR (dB) | SSIM | Speed, RTX 4050 Laptop |
+|---|---|---|---|
+| Bicubic | 41.91 | 0.9783 | — |
+| NVIDIA RTX VSR (driver) | 41.02 | 0.9748 | driver |
+| NVIDIA VFX SuperRes High | 40.66 | 0.9750 | 7 ms (720p→1440p) |
+| NVIDIA VFX SuperRes Ultra | 40.81 | 0.9727 | 9 ms (720p→1440p) |
+| 2xLiveActionV1 SPAN (TensorRT FP16) | 40.20 | 0.9755 | 22 ms (960x400→2x) |
+
+PSNR punishes every reconstructed edge that is not pixel-exact, so here it ranks plain blur first. The close-ups tell the real story (3x, nearest neighbour):
+
+![t=3s](img/bench-v2-zoom-03s.png)
+![t=17s](img/bench-v2-zoom-17s.png)
+![t=10s](img/bench-v2-zoom-10s.png)
+
+**Takeaway:** LiveAction SPAN is clearly the closest to the original on edges, window frames, buttons and text; fine flat texture gets slightly smoothed. NVIDIA VFX is a little cleaner than bicubic; driver RTX VSR is the softest of all. LiveAction SPAN becomes ClearFrame's default live engine (`engine/neural.py`, `live/gpu_stage.py`): one TensorRT FP16 engine for inputs up to 1024x576 — 72 fps at 640x360, 46 fps at 960x400, 29 fps at 1024x576. Bigger inputs go to NVIDIA VFX when installed.

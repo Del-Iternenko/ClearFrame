@@ -69,6 +69,42 @@ def on_battery():
     return bool(kernel32.GetSystemPowerStatus(ctypes.byref(s))) and s.ACLineStatus == 0
 
 
+# auto mode's default: only apps that show video (a fullscreen game must not get an overlay)
+VIDEO_APPS = {
+    # browsers
+    "chrome.exe", "msedge.exe", "firefox.exe", "zen.exe", "brave.exe", "opera.exe", "browser.exe", "vivaldi.exe",
+    "librewolf.exe", "floorp.exe", "waterfox.exe", "arc.exe", "thorium.exe", "chromium.exe", "yandex.exe",
+    # players and media apps
+    "vlc.exe", "mpc-hc64.exe", "mpc-hc.exe", "mpc-be64.exe", "mpc-be.exe", "potplayermini64.exe", "potplayermini.exe",
+    "potplayer64.exe", "potplayer.exe", "mpv.exe", "mpvnet.exe", "smplayer.exe", "kmplayer64x.exe", "kmplayer.exe",
+    "gom.exe", "wmplayer.exe", "video.ui.exe", "microsoft.media.player.exe", "kodi.exe", "plex.exe",
+    "plexmediaplayer.exe", "jellyfinmediaplayer.exe", "stremio.exe", "telegram.exe", "discord.exe",
+}
+
+
+def engines_available():
+    """Which engines can run here. ClearFrame Neural needs PyTorch + TensorRT (+ spandrel to export the
+    weights); NVIDIA Video Effects needs the user-installed nvidia-vfx package. Checked without importing."""
+    import importlib.util as iu
+    has = lambda *mods: all(iu.find_spec(m) is not None for m in mods)
+    return {"clearframe": has("torch", "tensorrt", "spandrel"), "nvvfx": has("nvvfx", "torch"),
+            "rtx_driver": True, "none": True}
+
+
+AVAILABLE = engines_available()
+
+
+def live_engine(setting):
+    """Settings engine -> live_upscale --engine (falls back to RTX VSR when one isn't installed)."""
+    if setting == "none":
+        return "none"
+    if setting == "clearframe" and AVAILABLE["clearframe"]:
+        return "neural"
+    if setting == "nvvfx" and AVAILABLE["nvvfx"]:
+        return "nvvfx"
+    return "rtx_driver"
+
+
 class Session:
     """One upscaling session in its own process (see live_upscale.py main)."""
 
@@ -78,8 +114,9 @@ class Session:
         self.info = ""
         s = settings
         overlay = True if auto else s["output"] == "overlay"
-        engine = "none" if s["engine"] == "none" else "rtx_driver"   # the only engines the live path has today
+        engine = live_engine(s["engine"])
         args = SESSION_CMD + ["--target", str(s["window_height"]), "--engine", engine,
+                "--quality", s["quality"], "--artifact-reduction", s["artifact_reduction"],
                 "--fps", str(s["max_fps"]), "--deband-strength", str(int(s["deband_strength"])),
                 "--deband-grain", str(int(s["deband_grain"]))]
         args += ["--monitor", str(monitor["index"])] if monitor else ["--hwnd", str(hwnd)]
@@ -248,8 +285,8 @@ class Controller:
             self.reload_hotkeys()
         if key == "auto_fullscreen" and not value and self.session and self.session.auto:
             self.stop()
-        elif key in ("output", "window_height", "engine", "source", "deband", "deband_strength", "deband_grain",
-                     "max_fps", "*"):
+        elif key in ("output", "window_height", "engine", "quality", "artifact_reduction", "source", "deband",
+                     "deband_strength", "deband_grain", "max_fps", "*"):
             self.restart()   # pipeline settings apply to a running session at once
         self.on_change()
 
@@ -260,6 +297,8 @@ class Controller:
             return True
         apps = {a.lower() for a in self.settings["auto_apps"]}
         exe = exe_of(hwnd).lower()
+        if mode == "video":   # games and other fullscreen apps are left alone
+            return exe in VIDEO_APPS or exe in apps
         return exe in apps if mode == "only" else exe not in apps
 
     def watch_loop(self):

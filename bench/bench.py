@@ -58,8 +58,13 @@ SOURCE = OUT / "source.mp4"           # degraded, SRC_W x SRC_H
 VARIANTS = {                          # name -> lossless output at REF_W x REF_H
     "bicubic": OUT / "bicubic.mkv",
     "rtx-vsr": OUT / "rtx-vsr.mkv",
+    "vfx-high": OUT / "vfx-high.mkv",
+    "vfx-ultra": OUT / "vfx-ultra.mkv",
+    "liveaction-span": OUT / "liveaction-span.mkv",
 }
-LABELS = {"bicubic": "Bicubic (browser)", "rtx-vsr": "NVIDIA RTX VSR"}
+LABELS = {"bicubic": "Bicubic (browser)", "rtx-vsr": "NVIDIA RTX VSR",
+          "vfx-high": "NVIDIA VFX SuperRes High", "vfx-ultra": "NVIDIA VFX SuperRes Ultra",
+          "liveaction-span": "2xLiveActionV1 SPAN"}
 
 
 # ---------------------------------------------------------------- helpers
@@ -218,6 +223,68 @@ def rtx_vsr():
     shutil.rmtree(frames)
 
 
+def vfx():
+    """NVIDIA Video Effects SDK VideoSuperRes (pip install nvidia-vfx, user-installed, proprietary):
+    the source decoded to RGB, upscaled on the GPU frame by frame, encoded losslessly."""
+    import numpy as np
+    import torch
+    from nvvfx import VideoSuperRes
+    for name, quality in (("vfx-high", "HIGH"), ("vfx-ultra", "ULTRA")):
+        log(f"{name}: VideoSuperRes {quality} {SRC_W}x{SRC_H} -> {REF_W}x{REF_H}")
+        dec = subprocess.Popen([str(tool("ffmpeg")), "-v", "error", "-i", str(SOURCE), "-f", "rawvideo",
+                                "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+        enc = subprocess.Popen([str(tool("ffmpeg")), "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                                "-s", f"{REF_W}x{REF_H}", "-framerate", "24", "-i", "-",
+                                *lossless(VARIANTS[name])], stdin=subprocess.PIPE)
+        sr = VideoSuperRes(quality=VideoSuperRes.QualityLevel[quality])
+        sr.output_width, sr.output_height = REF_W, REF_H
+        sr.load()
+        size, frames = SRC_W * SRC_H * 3, 0
+        while (buf := dec.stdout.read(size)) and len(buf) == size:
+            x = torch.from_numpy(np.frombuffer(bytearray(buf), np.uint8).reshape(SRC_H, SRC_W, 3)).cuda()
+            x = x.permute(2, 0, 1).float().div_(255).contiguous()
+            y = torch.from_dlpack(sr.run(x).image).clone()
+            enc.stdin.write(y.clamp_(0, 1).mul_(255).round_().byte().permute(1, 2, 0).contiguous().cpu().numpy().tobytes())
+            frames += 1
+        sr.close()
+        enc.stdin.close()
+        enc.wait()
+        dec.wait()
+        log(f"{name}: {frames} frames")
+
+
+def upscale_frames(name, fn):
+    """Decode SOURCE to RGB, run fn(float CUDA tensor 3xHxW in [0,1]) -> 3xREF_HxREF_W, encode losslessly."""
+    import numpy as np
+    import torch
+    dec = subprocess.Popen([str(tool("ffmpeg")), "-v", "error", "-i", str(SOURCE), "-f", "rawvideo",
+                            "-pix_fmt", "rgb24", "-"], stdout=subprocess.PIPE)
+    enc = subprocess.Popen([str(tool("ffmpeg")), "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
+                            "-s", f"{REF_W}x{REF_H}", "-framerate", "24", "-i", "-", *lossless(VARIANTS[name])],
+                           stdin=subprocess.PIPE)
+    size, frames = SRC_W * SRC_H * 3, 0
+    with torch.inference_mode():
+        while (buf := dec.stdout.read(size)) and len(buf) == size:
+            x = torch.from_numpy(np.frombuffer(bytearray(buf), np.uint8).reshape(SRC_H, SRC_W, 3)).cuda()
+            y = fn(x.permute(2, 0, 1).float().div_(255).contiguous())
+            enc.stdin.write(y.clamp(0, 1).mul_(255).round_().byte().permute(1, 2, 0).contiguous().cpu().numpy().tobytes())
+            frames += 1
+    enc.stdin.close()
+    enc.wait()
+    dec.wait()
+    log(f"{name}: {frames} frames")
+
+
+def liveaction_span():
+    """2xLiveActionV1_SPAN by jcj83429 (CC-BY-NC-SA-4.0): SPAN trained on H.264/VP9/H.265-compressed
+    live action. Weights: vendor/models/2xLiveActionV1_SPAN.pth (not in git). Loaded with spandrel."""
+    import spandrel
+    import torch
+    net = spandrel.ModelLoader().load_from_file(str(VENDOR / "models" / "2xLiveActionV1_SPAN.pth")).model
+    net = net.cuda().half().eval()
+    upscale_frames("liveaction-span", lambda x: net(x.half()[None])[0].float())
+
+
 def metrics(variant):
     """PSNR and SSIM of a variant against the clean reference (whole clip)."""
     res = subprocess.run([str(tool("ffmpeg")), "-hide_banner", "-i", str(variant), "-i", str(REFERENCE),
@@ -365,7 +432,7 @@ def compare():
     log(f"done -> {OUT / 'results.md'}")
 
 
-STEPS = {"setup": setup, "source": source, "bicubic": bicubic, "rtx-vsr": rtx_vsr, "compare": compare}
+STEPS = {"setup": setup, "source": source, "bicubic": bicubic, "rtx-vsr": rtx_vsr, "vfx": vfx, "liveaction-span": liveaction_span, "compare": compare}
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
