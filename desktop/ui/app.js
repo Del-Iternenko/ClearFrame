@@ -120,7 +120,8 @@ function pageHome() {
     onclick: () => on ? api().stop() : set("auto_fullscreen", !S.settings.auto_fullscreen) }, icon("power"));
   const sub = on ? (st.target || "") : t(S.settings.auto_fullscreen ? "home.hint_auto" : "home.hint_off");
   const actions = on ? [
-    h("button", { class: "btn primary", onclick: () => api().toggle_compare() }, icon("columns-2", "sm"), t(st.comparing ? "home.back" : "home.compare")),
+    h("button", { class: "btn primary", onclick: () => api().toggle_compare() }, icon("eye", "sm"), t(st.comparing ? "home.back" : "home.compare")),
+    h("button", { class: "btn" + (S.settings.split_compare ? " primary" : ""), onclick: () => set("split_compare", !S.settings.split_compare) }, icon("columns-2", "sm"), t("home.split")),
     h("button", { class: "btn", onclick: () => api().stop() }, icon("x", "sm"), t("home.stop")),
   ] : [];
   const SHORT = { rtx_driver: "RTX VSR", nvvfx: "NVIDIA VFX", clearframe: "ClearFrame Neural" };
@@ -143,7 +144,8 @@ function pageHome() {
 }
 
 function pageUpscale() {
-  const nvvfx = S.settings.engine === "nvvfx" && S.engines.nvvfx;
+  // NVIDIA VFX runs with its own engine and for ClearFrame Neural's inputs bigger than 1024x576
+  const nvvfx = ["nvvfx", "clearframe"].includes(S.settings.engine) && S.engines.nvvfx;
   const engines = ["clearframe", "nvvfx", "rtx_driver", "none"];
   const missing = engines.filter(o => S.engines[o] === false);
   // quality / artifact reduction are NVIDIA VFX controls: greyed with another engine, badged when VFX isn't installed
@@ -156,6 +158,8 @@ function pageUpscale() {
       row({ icon: "wand-sparkles", title: "up.ar", desc: "up.ar_d", disabled: !nvvfx, badge: vfxBadge,
         control: seg("artifact_reduction", ["off", "light", "strong"], o => t("ar." + o)) }),
       row({ icon: "film", title: "up.source", desc: "up.source_d", control: seg("source", ["auto", "360p", "480p", "720p", "1080p"], o => o === "auto" ? t("src.auto") : o) })),
+    ...section("cmp.section", null,
+      row({ icon: "columns-2", title: "cmp.split", desc: "cmp.split_d", control: toggle("split_compare") })),
     ...section("up.s_clean", null,
       row({ icon: "layers", title: "up.deband", desc: "up.deband_d", control: toggle("deband") }),
       row({ icon: "sliders-horizontal", title: "up.deband_strength", desc: "up.deband_strength_d", disabled: !S.settings.deband, control: range("deband_strength", 16, 128, 8) }),
@@ -221,7 +225,8 @@ function pageHotkeys() {
   return h("div", { class: "page" }, ...pageHead("hk.title", "hk.lead"),
     h("div", { class: "rows" },
       r("hotkey_window", "app-window", "hk.window", "hk.window_d"), r("hotkey_screen", "monitor", "hk.screen", "hk.screen_d"),
-      r("hotkey_auto", "zap", "hk.auto", "hk.auto_d"), r("hotkey_compare", "columns-2", "hk.compare", "hk.compare_d")));
+      r("hotkey_auto", "zap", "hk.auto", "hk.auto_d"), r("hotkey_compare", "eye", "hk.compare", "hk.compare_d"),
+      r("hotkey_split", "columns-2", "hk.split", "hk.split_d")));
 }
 
 function pageAppearance() {

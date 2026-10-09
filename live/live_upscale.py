@@ -221,6 +221,7 @@ class Output:
         deband (bool), deband_strength, deband_grain."""
         t = {"engine": "rtx_driver", "deband": True, "deband_strength": 48, "deband_grain": 16, **(tuning or {})}
         self.w, self.h = w, h
+        self.place, self.exclude, self.label = place, exclude, None
         # players and browsers already upscaled the video to the window: bring it back
         # to its real size (detected, see native_res) so the network sees real pixels;
         # until that is known, just cap the height (never upscale here)
@@ -269,9 +270,11 @@ class Output:
         self.proc = subprocess.Popen(args + ["-"], stdin=subprocess.PIPE, cwd=str(MPV.parent))
         source = f"real {in_w}x{in_h}" if native_h else f"{in_w}x{in_h}"
         if self.stage:
+            self.engine_label = self.stage.label
             self.info = f"on screen {w}x{h} -> {source} -> {self.stage.label} -> {self.stage.out_w}x{self.stage.out_h}"
         else:
             name = "no upscaling" if t["engine"] == "none" else f"RTX VSR x{scale:.2f}"
+            self.engine_label = "Bicubic" if t["engine"] == "none" else "NVIDIA RTX VSR (driver)"
             self.info = f"on screen {w}x{h} -> {source} -> {name} -> {out_w}x{out_h}"
 
     def window(self):
@@ -301,20 +304,41 @@ class Output:
         self.proc.terminate()
         if self.stage:
             self.stage.close()
+        if self.label:
+            self.label.close()
         self.host.close()
+
+    def set_split(self, on, words=("WITH", "WITHOUT"), rtl=False, accent=(118, 185, 0)):
+        """Split comparison (overlay only): upscaled on the left, the real original on the right."""
+        if not self.place:
+            return
+        from split_overlay import LabelWindow, clip_left, draw_overlay
+        x, y, w, h = map(int, self.place)
+        if on:
+            clip_left(self.host.hwnd, w // 2, h)
+            if self.label is None:
+                self.label = LabelWindow(x, y, w, h, exclude_from_capture=self.exclude)
+            self.label.show(draw_overlay(w, h, w // 2, f"{words[0]}: {self.engine_label}", words[1], accent, rtl))
+        else:
+            clip_left(self.host.hwnd, None, h)
+            if self.label:
+                self.label.close()
+                self.label = None
 
 
 class LiveSession:
     """Capture one window (and find its video area) or a whole screen, upscale it into an Output."""
 
     def __init__(self, hwnd=None, target=None, overlay=False, max_input=720, fps=60, on_status=print,
-                 source_width=None, monitor=None, tuning=None):
+                 source_width=None, monitor=None, tuning=None, split=None):
         """source_width: real width of the video if known (854 = 480p, 1280 = 720p...);
         None = detect it automatically (experimental). monitor: a monitors() entry to
         capture the whole screen instead of one window."""
         self.source_width = source_width
         self.monitor = monitor
         self.tuning = tuning
+        self.split = split   # None, or {"words": (with, without), "rtl": bool, "accent": (r, g, b)} when on
+        self.split_style = split
         self.hwnd, self.overlay, self.max_input, self.fps = hwnd, overlay, max_input, fps
         self.target = target or user32.GetSystemMetrics(1)
         self.on_status = on_status
@@ -420,6 +444,8 @@ class LiveSession:
                 max_input = 10 ** 6 if self.monitor else self.max_input
                 self.out = Output(w, h, self.target, max_input, self.fps, place, native_h, exclude, geometry, self.tuning)
                 self.rect, self.latest, self.native_changed = rect, None, False
+                if self.split:
+                    self.out.set_split(True, **self.split)
                 self.on_status(self.out.info)
             self.latest = crop
 
@@ -459,11 +485,20 @@ class LiveSession:
     def running(self):
         return not self.stopped.is_set()
 
+    def set_split(self, on):
+        """Switch the split comparison of the running output on or off."""
+        with self.lock:
+            self.split = self.split_style if on else None
+            if self.out is not None:
+                self.out.set_split(on, **(self.split_style or {}))
+
     def set_visible(self, visible):
         """Hide the output for a moment to see the original (compare)."""
         out = self.out
         if out is not None and out.host.hwnd:
             user32.ShowWindow(ctypes.c_void_p(out.host.hwnd), 8 if visible else 0)  # SW_SHOWNA / SW_HIDE
+            if out.label is not None:
+                user32.ShowWindow(ctypes.c_void_p(out.label.hwnd), 8 if visible else 0)
 
 
 def main(argv=None):
@@ -479,6 +514,10 @@ def main(argv=None):
     ap.add_argument("--source-width", type=int, default=None, help="real video width if known (854 = 480p...)")
     ap.add_argument("--overlay", action="store_true", help="show the result over the original video")
     ap.add_argument("--engine", default="rtx_driver", choices=["neural", "nvvfx", "rtx_driver", "none"])
+    ap.add_argument("--split", action="store_true", help="compare: upscaled left, original right (overlay)")
+    ap.add_argument("--split-words", default="WITH|WITHOUT", help="labels of the two sides")
+    ap.add_argument("--rtl", action="store_true", help="labels in a right-to-left language")
+    ap.add_argument("--accent", default="#76b900")
     ap.add_argument("--quality", default="high", choices=["low", "medium", "high", "ultra"], help="nvvfx")
     ap.add_argument("--artifact-reduction", default="strong", choices=["off", "light", "strong"], help="nvvfx")
     ap.add_argument("--fps", type=int, default=60, help="output pacing")
@@ -509,8 +548,12 @@ def main(argv=None):
     tuning = {"engine": args.engine, "deband": not args.no_deband,
               "deband_strength": args.deband_strength, "deband_grain": args.deband_grain,
               "quality": args.quality, "artifact_reduction": args.artifact_reduction}
+    a = args.accent.lstrip("#")
+    style = {"words": tuple(args.split_words.split("|", 1)), "rtl": args.rtl,
+             "accent": tuple(int(a[i:i + 2], 16) for i in (0, 2, 4))}
     session = LiveSession(hwnd, args.target, args.overlay, args.max_input, args.fps, on_status=status,
-                          source_width=args.source_width, monitor=monitor, tuning=tuning)
+                          source_width=args.source_width, monitor=monitor, tuning=tuning, split=style)
+    session.split = style if args.split else None
     session.start()
 
     def commands():
@@ -519,6 +562,8 @@ def main(argv=None):
             cmd = line.strip()
             if cmd in ("hide", "show"):
                 session.set_visible(cmd == "show")
+            elif cmd in ("split on", "split off"):
+                session.set_split(cmd == "split on")
             elif cmd == "stop":
                 session.stop()
                 break

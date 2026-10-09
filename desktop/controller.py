@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT / "live"))
 from live_upscale import (fullscreen_window, list_windows, monitor_of_window, monitors,  # noqa: E402
                           user32, window_title)
 
-from settings import SOURCE_WIDTH  # noqa: E402
+from settings import SOURCE_WIDTH, ui_language  # noqa: E402
 
 LIVE_SCRIPT = ROOT / "live" / "live_upscale.py"
 # ClearFrame.exe runs sessions as "ClearFrame.exe --session ..."; from source: python live_upscale.py
@@ -82,6 +82,11 @@ VIDEO_APPS = {
 }
 
 
+# labels of the split comparison, in the UI language
+SPLIT_WORDS = {"en": "WITH|WITHOUT", "ru": "С|БЕЗ", "zh": "使用|不使用", "hi": "साथ|बिना", "es": "CON|SIN",
+               "ar": "مع|بدون", "fr": "AVEC|SANS", "bn": "সহ|ছাড়া"}
+
+
 def engines_available():
     """Which engines can run here. ClearFrame Neural needs PyTorch + TensorRT (+ spandrel to export the
     weights); NVIDIA Video Effects needs the user-installed nvidia-vfx package. Checked without importing."""
@@ -113,7 +118,8 @@ class Session:
         self.started = time.time()
         self.info = ""
         s = settings
-        overlay = True if auto else s["output"] == "overlay"
+        overlay = True if auto or s["split_compare"] else s["output"] == "overlay"   # split needs the original underneath
+        self.overlay = overlay
         engine = live_engine(s["engine"])
         args = SESSION_CMD + ["--target", str(s["window_height"]), "--engine", engine,
                 "--quality", s["quality"], "--artifact-reduction", s["artifact_reduction"],
@@ -126,6 +132,12 @@ class Session:
             args.append("--no-deband")
         if SOURCE_WIDTH[s["source"]]:
             args += ["--source-width", str(SOURCE_WIDTH[s["source"]])]
+        lang = ui_language(s)
+        args += ["--split-words", SPLIT_WORDS.get(lang, SPLIT_WORDS["en"]), "--accent", s["accent"]]
+        if lang == "ar":
+            args.append("--rtl")
+        if s["split_compare"]:
+            args.append("--split")
         log("run: " + " ".join(args[len(SESSION_CMD):]))
         self.proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
                                      text=True, encoding="utf-8", errors="replace", creationflags=CREATE_NO_WINDOW)
@@ -162,7 +174,7 @@ VK = {**{chr(c): c for c in range(0x41, 0x5B)}, **{str(d): 0x30 + d for d in ran
       **{f"F{n}": 0x6F + n for n in range(1, 13)}, "Space": 0x20, "Home": 0x24, "End": 0x23, "Insert": 0x2D,
       "Delete": 0x2E, "PageUp": 0x21, "PageDown": 0x22}
 MODS = {"Alt": 0x1, "Ctrl": 0x2, "Shift": 0x4, "Win": 0x8}
-HOTKEY_ACTIONS = ["hotkey_window", "hotkey_screen", "hotkey_auto", "hotkey_compare"]
+HOTKEY_ACTIONS = ["hotkey_window", "hotkey_screen", "hotkey_auto", "hotkey_compare", "hotkey_split"]
 
 
 def parse_hotkey(text):
@@ -271,6 +283,9 @@ class Controller:
         s.send("hide" if self.comparing else "show")
         self._notify()
 
+    def toggle_split(self):
+        self.settings.set("split_compare", not self.settings["split_compare"])
+
     def toggle_auto(self):
         self.settings.set("auto_fullscreen", not self.settings["auto_fullscreen"])
 
@@ -281,10 +296,15 @@ class Controller:
         return [{"index": m["index"], "w": m["w"], "h": m["h"], "primary": m["primary"]} for m in monitors()]
 
     def _setting_changed(self, key, value):
-        if key in ("hotkey_window", "hotkey_screen", "hotkey_auto", "hotkey_compare", "*"):
+        if key in ("hotkey_window", "hotkey_screen", "hotkey_auto", "hotkey_compare", "hotkey_split", "*"):
             self.reload_hotkeys()
         if key == "auto_fullscreen" and not value and self.session and self.session.auto:
             self.stop()
+        elif key == "split_compare" and self.session:
+            if self.session.overlay:   # switch the running output at once, no restart
+                self.session.send("split on" if value else "split off")
+            else:
+                self.restart()         # a separate window has no original underneath: go overlay
         elif key in ("output", "window_height", "engine", "quality", "artifact_reduction", "source", "deband",
                      "deband_strength", "deband_grain", "max_fps", "*"):
             self.restart()   # pipeline settings apply to a running session at once
@@ -358,6 +378,8 @@ class Controller:
                     self.toggle_auto()
                 elif action == "hotkey_compare":
                     self.toggle_compare()
+                elif action == "hotkey_split":
+                    self.toggle_split()
             elif msg.message == 0x0400 + 1:   # our "reload hotkeys" message
                 self._register()
         for i in range(len(HOTKEY_ACTIONS)):

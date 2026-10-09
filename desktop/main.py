@@ -4,7 +4,6 @@
 """
 import ctypes
 import json
-import locale
 import sys
 import threading
 import webbrowser
@@ -18,7 +17,7 @@ from PIL import Image, ImageDraw
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from controller import AVAILABLE, LOG, Controller, log  # noqa: E402
-from settings import LANGUAGES, Settings  # noqa: E402
+from settings import LANGUAGES, Settings, system_language, ui_language  # noqa: E402
 
 APP_NAME = "ClearFrame"
 VERSION = "0.3.0"
@@ -30,16 +29,6 @@ NOTIFY = {"en": ("Upscaling on", "Upscaling off"), "ru": ("Улучшение в
           "ar": ("التحسين قيد التشغيل", "التحسين متوقف"), "fr": ("Amélioration activée", "Amélioration désactivée"),
           "bn": ("আপস্কেলিং চালু", "আপস্কেলিং বন্ধ")}
 UI = HERE / "ui" / "index.html"
-
-
-def system_language():
-    """Windows UI language -> one of ours (English if we don't have it)."""
-    try:
-        lcid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
-        code = (locale.windows_locale.get(lcid) or "en").split("_")[0]
-    except Exception:
-        code = "en"
-    return code if code in LANGUAGES else "en"
 
 
 def tray_image(active, accent):
@@ -145,8 +134,7 @@ class App:
         if running != self.was_running:
             self.was_running = running
             if self.settings["notifications"] and self.tray:
-                lang = self.settings["language"]
-                lang = system_language() if lang == "auto" else lang
+                lang = ui_language(self.settings)
                 on, off = NOTIFY.get(lang, NOTIFY["en"])
                 try:
                     self.tray.notify(self.controller.state()["target"] or " ", on if running else off)
@@ -192,6 +180,7 @@ class App:
             I("Upscale active window", lambda: c.toggle_foreground()),
             I("Upscale its whole screen", lambda: c.toggle_foreground(screen=True)),
             I("Compare with original", lambda: c.toggle_compare(), enabled=lambda i: c.session is not None),
+            I("Split screen: with | without", lambda: c.toggle_split(), checked=lambda i: self.settings["split_compare"]),
             I("Stop", lambda: c.stop(by_user=True), enabled=lambda i: c.session is not None),
             M.SEPARATOR,
             I("Quit", lambda: self.quit()),

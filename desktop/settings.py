@@ -43,12 +43,14 @@ SCHEMA = {
     # performance
     "max_fps": (60, [30, 60, 120]),
     "skip_duplicates": (True, bool),
+    "split_compare": (False, bool),     # test mode: upscaled left | original right
     "pause_on_battery": (False, bool),
     # hotkeys
     "hotkey_window": ("Ctrl+Alt+U", "hotkey"),
     "hotkey_screen": ("Ctrl+Alt+S", "hotkey"),
     "hotkey_auto": ("Ctrl+Alt+A", "hotkey"),
     "hotkey_compare": ("Ctrl+Alt+C", "hotkey"),
+    "hotkey_split": ("Ctrl+Alt+D", "hotkey"),
 }
 
 SOURCE_WIDTH = {"auto": None, "360p": 640, "480p": 854, "720p": 1280, "1080p": 1920}
@@ -126,3 +128,20 @@ class Settings:
                       else allowed if isinstance(allowed, str) else "choice",
                       "options": list(allowed) if isinstance(allowed, (list, tuple)) else None}
         return out
+
+
+def system_language():
+    """Windows UI language -> one of ours (English if we don't have it)."""
+    import ctypes
+    import locale
+    try:
+        lcid = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+        code = (locale.windows_locale.get(lcid) or "en").split("_")[0]
+    except Exception:
+        code = "en"
+    return code if code in LANGUAGES else "en"
+
+
+def ui_language(settings):
+    lang = settings["language"]
+    return system_language() if lang == "auto" else lang

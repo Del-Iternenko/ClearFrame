@@ -61,7 +61,7 @@ class GpuStage:
             self.net = _span()
             self.net.prepare(in_w, in_h)
             self.out_w, self.out_h = in_w * 2, in_h * 2
-            self.label = "ClearFrame Neural x2"
+            self.label = "ClearFrame Neural (LiveAction SPAN) x2"
         else:
             from nvvfx import VideoSuperRes
             # VFX goes straight to the shown size (up to 4x)

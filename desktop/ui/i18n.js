@@ -3,6 +3,7 @@ window.LANG_NAMES = { en: "English", zh: "中文", hi: "हिन्दी", es:
 window.RTL = ["ar"];
 window.I18N = {
 en: {
+  "cmp.section": "Comparison", "cmp.split": "Test mode: split screen", "cmp.split_d": "Left: upscaled, labelled with the model. Right: the original without it. A divider in the middle.", "home.split": "Split", "hk.split": "Split-screen test", "hk.split_d": "Turns the WITH / WITHOUT comparison on and off.",
   "home.hint_auto": "Put any video fullscreen — ClearFrame starts by itself.",
   "nav.home": "Home", "nav.upscale": "Upscaling", "nav.capture": "Capture & output", "nav.hotkeys": "Hotkeys",
   "nav.appearance": "Appearance", "nav.system": "System", "nav.about": "About", "nav.settings": "Settings",
@@ -17,7 +18,7 @@ en: {
   "picker.window": "Choose a window", "picker.window_d": "ClearFrame will find the video inside it.", "picker.screen": "Choose a screen",
   "picker.screen_d": "Everything on this monitor will be upscaled.", "picker.main": "main", "picker.cancel": "Cancel", "picker.screen_n": "Screen {n}", "picker.empty": "No windows found",
   "up.title": "Upscaling", "up.lead": "How the picture is reconstructed. Changes apply to a running session at once.",
-  "up.s_engine": "Engine", "up.engine": "Upscaling engine", "up.engine_d": "Neural network that rebuilds the picture. ClearFrame Neural restores edges and removes compression mush best.",
+  "up.s_engine": "Engine", "up.engine": "Upscaling engine", "up.engine_d": "The neural network that rebuilds the picture.",
   "engine.rtx_driver": "RTX Video Super Resolution", "engine.nvvfx": "NVIDIA Video Effects", "engine.clearframe": "ClearFrame Neural", "engine.none": "Off (plain scaling)",
   "up.quality": "Quality", "up.quality_d": "Higher levels look better and use more GPU.", "q.low": "Low", "q.medium": "Medium", "q.high": "High", "q.ultra": "Ultra",
   "up.ar": "Artifact reduction", "up.ar_d": "Removes compression blocks and smudges before upscaling — best for web video.", "ar.off": "Off", "ar.light": "Light", "ar.strong": "Strong",
@@ -53,6 +54,7 @@ en: {
   "common.saved": "Saved"
 },
 ru: {
+  "cmp.section": "Сравнение", "cmp.split": "Тестовый режим: пополам", "cmp.split_d": "Слева — с улучшением и названием модели, справа — оригинал без него. Посередине разделитель.", "home.split": "Пополам", "hk.split": "Тест пополам", "hk.split_d": "Включает и выключает сравнение С и БЕЗ.",
   "home.hint_auto": "Разверните любое видео на весь экран — ClearFrame включится сам.",
   "nav.home": "Главная", "nav.upscale": "Апскейл", "nav.capture": "Захват и вывод", "nav.hotkeys": "Горячие клавиши",
   "nav.appearance": "Оформление", "nav.system": "Система", "nav.about": "О программе", "nav.settings": "Настройки",
@@ -67,7 +69,7 @@ ru: {
   "picker.window": "Выберите окно", "picker.window_d": "ClearFrame сам найдёт в нём видео.", "picker.screen": "Выберите экран",
   "picker.screen_d": "Будет улучшено всё, что на этом мониторе.", "picker.main": "основной", "picker.cancel": "Отмена", "picker.screen_n": "Экран {n}", "picker.empty": "Окон не найдено",
   "up.title": "Апскейл", "up.lead": "Как восстанавливается картинка. Изменения сразу применяются к работающему улучшению.",
-  "up.s_engine": "Движок", "up.engine": "Движок апскейла", "up.engine_d": "Нейросеть, которая восстанавливает картинку. Нейросеть ClearFrame лучше всех возвращает чёткие края и убирает мыло от сжатия.",
+  "up.s_engine": "Движок", "up.engine": "Движок апскейла", "up.engine_d": "Нейросеть, которая восстанавливает картинку.",
   "engine.rtx_driver": "RTX Video Super Resolution", "engine.nvvfx": "NVIDIA Video Effects", "engine.clearframe": "Нейросеть ClearFrame", "engine.none": "Выкл. (обычное растягивание)",
   "up.quality": "Качество", "up.quality_d": "Чем выше, тем лучше картинка и больше нагрузка на видеокарту.", "q.low": "Низкое", "q.medium": "Среднее", "q.high": "Высокое", "q.ultra": "Ультра",
   "up.ar": "Удаление артефактов", "up.ar_d": "Убирает квадраты и мыло сжатия перед апскейлом — лучше всего для видео с сайтов.", "ar.off": "Выкл.", "ar.light": "Слабое", "ar.strong": "Сильное",
@@ -103,6 +105,7 @@ ru: {
   "common.saved": "Сохранено"
 },
 zh: {
+  "cmp.section": "对比", "cmp.split": "测试模式：分屏", "cmp.split_d": "左侧为增强后画面并标注模型，右侧为未处理的原始画面，中间有分隔线。", "home.split": "分屏", "hk.split": "分屏测试", "hk.split_d": "开启或关闭“使用 / 不使用”对比。",
   "home.hint_auto": "将任意视频全屏播放——ClearFrame 会自动启动。",
   "nav.home": "主页", "nav.upscale": "超分辨率", "nav.capture": "捕获与输出", "nav.hotkeys": "快捷键",
   "nav.appearance": "外观", "nav.system": "系统", "nav.about": "关于", "nav.settings": "设置",
@@ -117,7 +120,7 @@ zh: {
   "picker.window": "选择窗口", "picker.window_d": "ClearFrame 会在其中找到视频。", "picker.screen": "选择屏幕",
   "picker.screen_d": "该显示器上的所有内容都会被增强。", "picker.main": "主屏幕", "picker.cancel": "取消", "picker.screen_n": "屏幕 {n}", "picker.empty": "未找到窗口",
   "up.title": "超分辨率", "up.lead": "画面如何被重建。更改会立即应用到正在运行的会话。",
-  "up.s_engine": "引擎", "up.engine": "超分引擎", "up.engine_d": "重建画面的神经网络。ClearFrame 神经网络最能恢复清晰边缘并去除压缩模糊。",
+  "up.s_engine": "引擎", "up.engine": "超分引擎", "up.engine_d": "重建画面的神经网络。",
   "engine.rtx_driver": "RTX 视频超分辨率", "engine.nvvfx": "NVIDIA 视频特效", "engine.clearframe": "ClearFrame 神经网络", "engine.none": "关闭（普通缩放）",
   "up.quality": "质量", "up.quality_d": "级别越高效果越好，显卡占用也越高。", "q.low": "低", "q.medium": "中", "q.high": "高", "q.ultra": "超高",
   "up.ar": "伪影消除", "up.ar_d": "在放大前去除压缩方块和模糊——最适合网络视频。", "ar.off": "关闭", "ar.light": "轻度", "ar.strong": "强力",
@@ -153,6 +156,7 @@ zh: {
   "common.saved": "已保存"
 },
 hi: {
+  "cmp.section": "तुलना", "cmp.split": "टेस्ट मोड: आधी-आधी स्क्रीन", "cmp.split_d": "बाईं ओर अपस्केल की गई तस्वीर और मॉडल का नाम, दाईं ओर बिना बदलाव का मूल। बीच में विभाजक।", "home.split": "आधा-आधा", "hk.split": "आधी स्क्रीन टेस्ट", "hk.split_d": "साथ / बिना तुलना चालू या बंद करता है।",
   "home.hint_auto": "कोई भी वीडियो फ़ुलस्क्रीन करें — ClearFrame अपने आप शुरू होगा।",
   "nav.home": "होम", "nav.upscale": "अपस्केलिंग", "nav.capture": "कैप्चर और आउटपुट", "nav.hotkeys": "हॉटकी",
   "nav.appearance": "रूप-रंग", "nav.system": "सिस्टम", "nav.about": "परिचय", "nav.settings": "सेटिंग्स",
@@ -167,7 +171,7 @@ hi: {
   "picker.window": "विंडो चुनें", "picker.window_d": "ClearFrame उसके अंदर वीडियो ढूँढ लेगा।", "picker.screen": "स्क्रीन चुनें",
   "picker.screen_d": "इस मॉनिटर पर सब कुछ अपस्केल होगा।", "picker.main": "मुख्य", "picker.cancel": "रद्द करें", "picker.screen_n": "स्क्रीन {n}", "picker.empty": "कोई विंडो नहीं मिली",
   "up.title": "अपस्केलिंग", "up.lead": "तस्वीर कैसे दोबारा बनाई जाती है। बदलाव चल रहे सत्र पर तुरंत लागू होते हैं।",
-  "up.s_engine": "इंजन", "up.engine": "अपस्केलिंग इंजन", "up.engine_d": "वह न्यूरल नेटवर्क जो तस्वीर दोबारा बनाता है। ClearFrame न्यूरल किनारों को सबसे साफ़ लौटाता है और कंप्रेशन का धुंधलापन हटाता है।",
+  "up.s_engine": "इंजन", "up.engine": "अपस्केलिंग इंजन", "up.engine_d": "वह न्यूरल नेटवर्क जो तस्वीर दोबारा बनाता है।",
   "engine.rtx_driver": "RTX Video Super Resolution", "engine.nvvfx": "NVIDIA Video Effects", "engine.clearframe": "ClearFrame न्यूरल", "engine.none": "बंद (सामान्य स्केलिंग)",
   "up.quality": "गुणवत्ता", "up.quality_d": "ऊँचा स्तर बेहतर दिखता है और GPU ज़्यादा लेता है।", "q.low": "कम", "q.medium": "मध्यम", "q.high": "ऊँची", "q.ultra": "अल्ट्रा",
   "up.ar": "आर्टिफ़ैक्ट हटाना", "up.ar_d": "अपस्केल से पहले कम्प्रेशन के ब्लॉक और धुंधलापन हटाता है — वेब वीडियो के लिए सबसे अच्छा।", "ar.off": "बंद", "ar.light": "हल्का", "ar.strong": "तेज़",
@@ -203,6 +207,7 @@ hi: {
   "common.saved": "सहेजा गया"
 },
 es: {
+  "cmp.section": "Comparación", "cmp.split": "Modo de prueba: pantalla dividida", "cmp.split_d": "A la izquierda, con escalado y el nombre del modelo; a la derecha, el original sin él. Un divisor en medio.", "home.split": "Dividir", "hk.split": "Prueba en pantalla dividida", "hk.split_d": "Activa y desactiva la comparación CON / SIN.",
   "home.hint_auto": "Pon cualquier vídeo a pantalla completa: ClearFrame se inicia solo.",
   "nav.home": "Inicio", "nav.upscale": "Escalado", "nav.capture": "Captura y salida", "nav.hotkeys": "Atajos",
   "nav.appearance": "Apariencia", "nav.system": "Sistema", "nav.about": "Acerca de", "nav.settings": "Ajustes",
@@ -217,7 +222,7 @@ es: {
   "picker.window": "Elige una ventana", "picker.window_d": "ClearFrame encontrará el vídeo dentro.", "picker.screen": "Elige una pantalla",
   "picker.screen_d": "Se escalará todo lo que haya en este monitor.", "picker.main": "principal", "picker.cancel": "Cancelar", "picker.screen_n": "Pantalla {n}", "picker.empty": "No se encontraron ventanas",
   "up.title": "Escalado", "up.lead": "Cómo se reconstruye la imagen. Los cambios se aplican al instante.",
-  "up.s_engine": "Motor", "up.engine": "Motor de escalado", "up.engine_d": "La red neuronal que reconstruye la imagen. ClearFrame Neural es la que mejor recupera los bordes y quita el emborronado de la compresión.",
+  "up.s_engine": "Motor", "up.engine": "Motor de escalado", "up.engine_d": "La red neuronal que reconstruye la imagen.",
   "engine.rtx_driver": "RTX Video Super Resolution", "engine.nvvfx": "NVIDIA Video Effects", "engine.clearframe": "ClearFrame Neural", "engine.none": "Apagado (escalado simple)",
   "up.quality": "Calidad", "up.quality_d": "Los niveles altos se ven mejor y usan más GPU.", "q.low": "Baja", "q.medium": "Media", "q.high": "Alta", "q.ultra": "Ultra",
   "up.ar": "Reducción de artefactos", "up.ar_d": "Quita bloques y manchas de compresión antes de escalar; ideal para vídeo web.", "ar.off": "No", "ar.light": "Suave", "ar.strong": "Fuerte",
@@ -253,6 +258,7 @@ es: {
   "common.saved": "Guardado"
 },
 ar: {
+  "cmp.section": "المقارنة", "cmp.split": "وضع الاختبار: شاشة مقسومة", "cmp.split_d": "على اليسار الصورة المحسّنة مع اسم النموذج، وعلى اليمين الأصل دون تحسين، وبينهما فاصل.", "home.split": "تقسيم", "hk.split": "اختبار الشاشة المقسومة", "hk.split_d": "يشغّل مقارنة «مع / بدون» ويوقفها.",
   "home.hint_auto": "اعرض أي فيديو بملء الشاشة — سيبدأ ClearFrame تلقائيًا.",
   "nav.home": "الرئيسية", "nav.upscale": "تحسين الدقة", "nav.capture": "الالتقاط والإخراج", "nav.hotkeys": "الاختصارات",
   "nav.appearance": "المظهر", "nav.system": "النظام", "nav.about": "حول", "nav.settings": "الإعدادات",
@@ -267,7 +273,7 @@ ar: {
   "picker.window": "اختر نافذة", "picker.window_d": "سيجد ClearFrame الفيديو داخلها.", "picker.screen": "اختر شاشة",
   "picker.screen_d": "سيُحسَّن كل ما على هذه الشاشة.", "picker.main": "الرئيسية", "picker.cancel": "إلغاء", "picker.screen_n": "الشاشة {n}", "picker.empty": "لم يتم العثور على نوافذ",
   "up.title": "تحسين الدقة", "up.lead": "كيف تُعاد بناء الصورة. تُطبَّق التغييرات فورًا على الجلسة الجارية.",
-  "up.s_engine": "المحرّك", "up.engine": "محرّك تحسين الدقة", "up.engine_d": "الشبكة العصبية التي تعيد بناء الصورة. يستعيد ClearFrame العصبي الحواف الحادة ويزيل ضبابية الضغط بأفضل شكل.",
+  "up.s_engine": "المحرّك", "up.engine": "محرّك تحسين الدقة", "up.engine_d": "الشبكة العصبية التي تعيد بناء الصورة.",
   "engine.rtx_driver": "RTX Video Super Resolution", "engine.nvvfx": "NVIDIA Video Effects", "engine.clearframe": "ClearFrame العصبي", "engine.none": "إيقاف (تكبير عادي)",
   "up.quality": "الجودة", "up.quality_d": "المستويات الأعلى أجمل وتستهلك وحدة رسوميات أكثر.", "q.low": "منخفضة", "q.medium": "متوسطة", "q.high": "عالية", "q.ultra": "فائقة",
   "up.ar": "إزالة التشوّهات", "up.ar_d": "تزيل مربعات الضغط والتلطيخ قبل التكبير — الأفضل لفيديو الإنترنت.", "ar.off": "إيقاف", "ar.light": "خفيفة", "ar.strong": "قوية",
@@ -303,6 +309,7 @@ ar: {
   "common.saved": "تم الحفظ"
 },
 fr: {
+  "cmp.section": "Comparaison", "cmp.split": "Mode test : écran partagé", "cmp.split_d": "À gauche, l’image améliorée avec le nom du modèle ; à droite, l’original sans traitement. Un séparateur au milieu.", "home.split": "Partager", "hk.split": "Test en écran partagé", "hk.split_d": "Active ou désactive la comparaison AVEC / SANS.",
   "home.hint_auto": "Mettez une vidéo en plein écran : ClearFrame démarre tout seul.",
   "nav.home": "Accueil", "nav.upscale": "Upscaling", "nav.capture": "Capture et sortie", "nav.hotkeys": "Raccourcis",
   "nav.appearance": "Apparence", "nav.system": "Système", "nav.about": "À propos", "nav.settings": "Paramètres",
@@ -317,7 +324,7 @@ fr: {
   "picker.window": "Choisir une fenêtre", "picker.window_d": "ClearFrame y trouvera la vidéo.", "picker.screen": "Choisir un écran",
   "picker.screen_d": "Tout ce qui est sur ce moniteur sera amélioré.", "picker.main": "principal", "picker.cancel": "Annuler", "picker.screen_n": "Écran {n}", "picker.empty": "Aucune fenêtre trouvée",
   "up.title": "Upscaling", "up.lead": "Comment l’image est reconstruite. Les changements s’appliquent immédiatement.",
-  "up.s_engine": "Moteur", "up.engine": "Moteur d’upscaling", "up.engine_d": "Le réseau neuronal qui reconstruit l’image. ClearFrame Neural restaure le mieux les contours et retire le flou de compression.",
+  "up.s_engine": "Moteur", "up.engine": "Moteur d’upscaling", "up.engine_d": "Le réseau neuronal qui reconstruit l’image.",
   "engine.rtx_driver": "RTX Video Super Resolution", "engine.nvvfx": "NVIDIA Video Effects", "engine.clearframe": "ClearFrame Neural", "engine.none": "Désactivé (mise à l’échelle simple)",
   "up.quality": "Qualité", "up.quality_d": "Plus le niveau est élevé, plus c’est beau et plus le GPU travaille.", "q.low": "Basse", "q.medium": "Moyenne", "q.high": "Haute", "q.ultra": "Ultra",
   "up.ar": "Réduction des artefacts", "up.ar_d": "Supprime les blocs et le flou de compression avant l’upscaling — idéal pour la vidéo web.", "ar.off": "Non", "ar.light": "Légère", "ar.strong": "Forte",
@@ -353,6 +360,7 @@ fr: {
   "common.saved": "Enregistré"
 },
 bn: {
+  "cmp.section": "তুলনা", "cmp.split": "টেস্ট মোড: অর্ধেক-অর্ধেক স্ক্রিন", "cmp.split_d": "বাঁয়ে আপস্কেল করা ছবি ও মডেলের নাম, ডানে কোনো বদল ছাড়া আসল। মাঝে বিভাজক।", "home.split": "অর্ধেক", "hk.split": "অর্ধেক স্ক্রিন টেস্ট", "hk.split_d": "সহ / ছাড়া তুলনা চালু বা বন্ধ করে।",
   "home.hint_auto": "যেকোনো ভিডিও ফুলস্ক্রিন করুন — ClearFrame নিজে থেকেই শুরু হবে।",
   "nav.home": "হোম", "nav.upscale": "আপস্কেলিং", "nav.capture": "ক্যাপচার ও আউটপুট", "nav.hotkeys": "হটকি",
   "nav.appearance": "চেহারা", "nav.system": "সিস্টেম", "nav.about": "পরিচিতি", "nav.settings": "সেটিংস",
@@ -367,7 +375,7 @@ bn: {
   "picker.window": "উইন্ডো বেছে নিন", "picker.window_d": "ClearFrame এর ভেতরে ভিডিও খুঁজে নেবে।", "picker.screen": "স্ক্রিন বেছে নিন",
   "picker.screen_d": "এই মনিটরের সবকিছু আপস্কেল হবে।", "picker.main": "প্রধান", "picker.cancel": "বাতিল", "picker.screen_n": "স্ক্রিন {n}", "picker.empty": "কোনো উইন্ডো পাওয়া যায়নি",
   "up.title": "আপস্কেলিং", "up.lead": "ছবি কীভাবে পুনর্গঠিত হয়। পরিবর্তন চলমান সেশনে সঙ্গে সঙ্গে প্রযোজ্য হয়।",
-  "up.s_engine": "ইঞ্জিন", "up.engine": "আপস্কেলিং ইঞ্জিন", "up.engine_d": "যে নিউরাল নেটওয়ার্ক ছবি নতুন করে গড়ে। ClearFrame নিউরাল সবচেয়ে ভালোভাবে ধারালো প্রান্ত ফেরায় ও কমপ্রেশনের ঝাপসাভাব সরায়।",
+  "up.s_engine": "ইঞ্জিন", "up.engine": "আপস্কেলিং ইঞ্জিন", "up.engine_d": "যে নিউরাল নেটওয়ার্ক ছবি নতুন করে গড়ে।",
   "engine.rtx_driver": "RTX Video Super Resolution", "engine.nvvfx": "NVIDIA Video Effects", "engine.clearframe": "ClearFrame নিউরাল", "engine.none": "বন্ধ (সাধারণ স্কেলিং)",
   "up.quality": "মান", "up.quality_d": "উঁচু স্তরে ছবি ভালো হয়, GPU বেশি লাগে।", "q.low": "নিম্ন", "q.medium": "মাঝারি", "q.high": "উচ্চ", "q.ultra": "আল্ট্রা",
   "up.ar": "আর্টিফ্যাক্ট কমানো", "up.ar_d": "আপস্কেলের আগে কম্প্রেশনের ব্লক ও ঝাপসা ভাব দূর করে — ওয়েব ভিডিওর জন্য সেরা।", "ar.off": "বন্ধ", "ar.light": "হালকা", "ar.strong": "জোরালো",
