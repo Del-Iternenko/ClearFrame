@@ -14,7 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "live"))
-from live_upscale import (fullscreen_window, list_windows, monitor_of_window, monitors,  # noqa: E402
+from live_upscale import (covers_monitor, fullscreen_window, list_windows, monitor_of_window, monitors,  # noqa: E402
+                          window_pid,
                           user32, window_title)
 
 from settings import SOURCE_WIDTH, ui_language  # noqa: E402
@@ -88,25 +89,24 @@ SPLIT_WORDS = {"en": "WITH|WITHOUT", "ru": "С|БЕЗ", "zh": "使用|不使用"
 
 
 def engines_available():
-    """Which engines can run here. ClearFrame Neural needs PyTorch + TensorRT (+ spandrel to export the
-    weights); NVIDIA Video Effects needs the user-installed nvidia-vfx package. Checked without importing."""
+    """Which engines can run here. ClearFrame Neural needs PyTorch + TensorRT and a trained model
+    (installed, or the newest run in train/runs). Checked without importing them."""
     import importlib.util as iu
     has = lambda *mods: all(iu.find_spec(m) is not None for m in mods)
-    return {"clearframe": has("torch", "tensorrt", "spandrel"), "nvvfx": has("nvvfx", "torch"),
-            "rtx_driver": True, "none": True}
+    home = Path(os.environ.get("LOCALAPPDATA", ".")) / "ClearFrame" / "models" / "clearframe-clean.pt"
+    model = home.exists() or any((ROOT / "train" / "runs").glob("*/clean.pt"))
+    return {"clearframe": has("torch", "tensorrt") and model, "rtx_driver": True, "none": True}
 
 
 AVAILABLE = engines_available()
 
 
 def live_engine(setting):
-    """Settings engine -> live_upscale --engine (falls back to RTX VSR when one isn't installed)."""
+    """Settings engine -> live_upscale --engine (RTX VSR when ClearFrame Neural can't run here)."""
     if setting == "none":
         return "none"
     if setting == "clearframe" and AVAILABLE["clearframe"]:
         return "neural"
-    if setting == "nvvfx" and AVAILABLE["nvvfx"]:
-        return "nvvfx"
     return "rtx_driver"
 
 
@@ -122,7 +122,7 @@ class Session:
         self.overlay = overlay
         engine = live_engine(s["engine"])
         args = SESSION_CMD + ["--target", str(s["window_height"]), "--engine", engine,
-                "--quality", s["quality"], "--artifact-reduction", s["artifact_reduction"],
+                "--strength", f"{s['detail_strength'] / 100:.2f}",
                 "--fps", str(s["max_fps"]), "--deband-strength", str(int(s["deband_strength"])),
                 "--deband-grain", str(int(s["deband_grain"]))]
         args += ["--monitor", str(monitor["index"])] if monitor else ["--hwnd", str(hwnd)]
@@ -305,7 +305,7 @@ class Controller:
                 self.session.send("split on" if value else "split off")
             else:
                 self.restart()         # a separate window has no original underneath: go overlay
-        elif key in ("output", "window_height", "engine", "quality", "artifact_reduction", "source", "deband",
+        elif key in ("output", "window_height", "engine", "detail_strength", "source", "deband",
                      "deband_strength", "deband_grain", "max_fps", "*"):
             self.restart()   # pipeline settings apply to a running session at once
         self.on_change()
@@ -329,6 +329,19 @@ class Controller:
             except Exception:
                 log("watcher error:\n" + traceback.format_exc())
 
+    def _auto_lost(self, hwnd):
+        """Why an auto session should end ('' = it shouldn't)."""
+        if not self.settings["auto_fullscreen"]:
+            return "auto mode turned off"
+        if not covers_monitor(hwnd):
+            return "the video left fullscreen"
+        fg = user32.GetForegroundWindow()
+        if fg and fg != hwnd and window_pid(fg) != window_pid(hwnd):
+            mf, mv = monitor_of_window(fg), monitor_of_window(hwnd)
+            if mf and mv and mf["handle"] == mv["handle"] and user32.IsWindowVisible(ctypes.c_void_p(fg)):
+                return f"another window came to the front on that screen ({exe_of(fg)}: {window_title(fg)[:40]})"
+        return ""
+
     def _watch_step(self, candidate, since):
         session = self.session
         if session is not None and not session.running():
@@ -341,15 +354,19 @@ class Controller:
             return None, 0.0
         if session is not None and not session.auto:
             return candidate, since
+        if session is not None:
+            # keep going while the video stays fullscreen; working in another window on another monitor
+            # (e.g. ClearFrame's own settings) must not stop it
+            why = self._auto_lost(session.hwnd)
+            self.lost = self.lost + 1 if why else 0
+            if self.lost >= LOST_POLLS:
+                self.lost = 0
+                log("auto stop: " + why)
+                self.stop()
+            return candidate, since
         hwnd = fullscreen_window() if self.settings["auto_fullscreen"] else None
         if hwnd and not self._app_allowed(hwnd):
             hwnd = None
-        if session is not None:
-            self.lost = 0 if hwnd == session.hwnd else self.lost + 1
-            if self.lost >= LOST_POLLS:
-                self.lost = 0
-                self.stop()
-            return candidate, since
         if hwnd != self.ended:
             self.ended = None
         if hwnd is None or hwnd == self.ended:

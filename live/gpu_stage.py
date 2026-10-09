@@ -1,76 +1,42 @@
-"""Neural upscaling of live frames on the GPU (used by live_upscale.Output).
+"""ClearFrame's network on live frames, on the GPU (used by live_upscale.Output).
 
-Captured BGRA frame (numpy) -> CUDA -> scaled to the network's input size -> network:
-    "neural": ClearFrame's default network (engine/neural.py, TensorRT FP16), 2x;
-              inputs that don't fit it go to NVIDIA VFX when installed, else are scaled down to fit
-    "nvvfx":  NVIDIA Video Effects VideoSuperRes (pip install nvidia-vfx; user-installed, not bundled)
--> RGB24 bytes for mpv. The heavy work runs in a worker thread on the newest frame only, so
-frames that haven't changed are never processed twice.
+Captured BGRA frame (numpy, the video exactly as it is shown on screen) -> CUDA -> the network
+(engine/neural.py, TensorRT FP16) at the same size -> RGB24 bytes for mpv. The frame is never scaled
+down first: the network restores what is on screen, whatever the stream's real resolution was.
+The work runs in a worker thread on the newest frame only, so a frame that hasn't changed is never
+processed twice.
 """
 import sys
 import threading
 import time
 from pathlib import Path
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))
 import neural  # noqa: E402
 
-VFX_QUALITY = {"low": "LOW", "medium": "MEDIUM", "high": "HIGH", "ultra": "ULTRA"}
-_cache = {}   # loaded networks, shared by every Output of this session process
+_cache = {}   # loaded networks by strength, shared by every Output of this session process
 stats = {"frames": 0, "ms": 0.0}   # frames through the network in this process, mean time per frame
 
 
-def vfx_available():
-    try:
-        import nvvfx  # noqa: F401
-        return True
-    except Exception:
-        return False
-
-
-def _span():
-    if "span" not in _cache:
-        _cache["span"] = neural.NeuralUpscaler("liveaction-span")
-    return _cache["span"]
-
-
-def prepare():
-    """Load the default network now (weights download + engine build on first use)."""
-    _span()
+def prepare(strength):
+    """Load the network now (the engine for this strength is built on first use, about a minute)."""
+    if strength not in _cache:
+        _cache[strength] = neural.Restorer(strength)
+    return _cache[strength]
 
 
 class GpuStage:
-    def __init__(self, engine, in_w, in_h, target_w, target_h, tuning):
-        """in_w x in_h: the video's real size; target: the size it is shown at."""
-        quality = VFX_QUALITY.get(tuning.get("quality", "high"), "HIGH")
-        # artifact reduction off -> NVIDIA's high-bitrate modes (keep everything), on -> standard modes
-        if tuning.get("artifact_reduction", "strong") == "off":
-            quality = "HIGHBITRATE_" + quality
-        fits = in_w <= neural.MAX_W and in_h <= neural.MAX_H
-        if engine == "neural" and not fits and vfx_available():
-            engine = "nvvfx"
-        if engine == "neural" and not fits:
-            k = min(neural.MAX_W / in_w, neural.MAX_H / in_h)
-            in_w, in_h = int(in_w * k) // 2 * 2, int(in_h * k) // 2 * 2
-        self.engine, self.in_w, self.in_h = engine, in_w, in_h
-        if engine == "neural":
-            self.net = _span()
-            self.net.prepare(in_w, in_h)
-            self.out_w, self.out_h = in_w * 2, in_h * 2
-            self.label = "ClearFrame Neural (LiveAction SPAN) x2"
-        else:
-            from nvvfx import VideoSuperRes
-            # VFX goes straight to the shown size (up to 4x)
-            k = max(1.0, min(4.0, target_h / in_h))
-            self.out_w, self.out_h = int(in_w * k) // 2 * 2, int(in_h * k) // 2 * 2
-            self.vfx = VideoSuperRes(quality=VideoSuperRes.QualityLevel[quality])
-            self.vfx.output_width, self.vfx.output_height = self.out_w, self.out_h
-            self.vfx.load()
-            self.label = f"NVIDIA VFX {quality.title()} x{k:.2f}"
+    def __init__(self, w, h, strength):
+        # the network needs even sizes and has a size limit: fit the frame into it (rarely needed)
+        k = min(1.0, neural.MAX_W / w, neural.MAX_H / h)
+        self.in_w, self.in_h = int(w * k) // 2 * 2, int(h * k) // 2 * 2
+        self.out_w, self.out_h = self.in_w, self.in_h
+        self.net = prepare(strength)
+        self.net.prepare(self.in_w, self.in_h)
+        self.label = f"ClearFrame Neural · {round(strength * 100)}% detail"
         self.ms = 0.0
         self.pending, self.last_in, self.result = None, None, None
         self.wake = threading.Event()
@@ -99,11 +65,7 @@ class GpuStage:
                 if x.shape[1:] != (self.in_h, self.in_w):
                     x = F.interpolate(x[None], size=(self.in_h, self.in_w), mode="bilinear",
                                       antialias=True, align_corners=False)[0]
-                x = x.contiguous()
-                if self.engine == "neural":
-                    y = self.net(x)
-                else:
-                    y = torch.from_dlpack(self.vfx.run(x).image).clone()
+                y = self.net(x.contiguous())
                 y = y.clamp_(0, 1).mul_(255).round_().to(torch.uint8).permute(1, 2, 0).contiguous()
                 self.result = y.cpu().numpy().tobytes()
             ms = (time.perf_counter() - t0) * 1000
@@ -114,10 +76,3 @@ class GpuStage:
     def close(self):
         self.stopped = True
         self.wake.set()
-        vfx = getattr(self, "vfx", None)
-        if vfx is not None:
-            time.sleep(0.1)
-            try:
-                vfx.close()
-            except Exception:
-                pass

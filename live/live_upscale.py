@@ -121,12 +121,24 @@ def fullscreen_window():
         return None
     if window_class(hwnd) in SHELL_CLASSES or window_title(hwnd).startswith("ClearFrame"):
         return None
+    return hwnd if covers_monitor(hwnd) else None
+
+
+def covers_monitor(hwnd):
+    """The window is visible, not minimised and covers its whole monitor."""
+    if not hwnd or not user32.IsWindow(ctypes.c_void_p(hwnd)) or not user32.IsWindowVisible(ctypes.c_void_p(hwnd))             or user32.IsIconic(ctypes.c_void_p(hwnd)):
+        return False
     m = monitor_of_window(hwnd)
     rect = RECT()
     user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(rect))
-    if m and rect.left <= m["x"] and rect.top <= m["y"] and rect.right >= m["x"] + m["w"] and rect.bottom >= m["y"] + m["h"]:
-        return hwnd
-    return None
+    return bool(m and rect.left <= m["x"] and rect.top <= m["y"] and rect.right >= m["x"] + m["w"]
+                and rect.bottom >= m["y"] + m["h"])
+
+
+def window_pid(hwnd):
+    pid = ctypes.c_ulong()
+    user32.GetWindowThreadProcessId(ctypes.c_void_p(hwnd), ctypes.byref(pid))
+    return pid.value
 
 
 def monitor_of_window(hwnd):
@@ -217,15 +229,18 @@ class Output:
 
     def __init__(self, w, h, target, max_input, fps, place=None, native_h=None, exclude=False, geometry=None,
                  tuning=None):
-        """tuning: engine ('neural', 'nvvfx', 'rtx_driver' or 'none'), quality, artifact_reduction (nvvfx),
+        """tuning: engine ('neural', 'rtx_driver' or 'none'), strength (neural: 0 clean only .. 1 full detail),
         deband (bool), deband_strength, deband_grain."""
         t = {"engine": "rtx_driver", "deband": True, "deband_strength": 48, "deband_grain": 16, **(tuning or {})}
         self.w, self.h = w, h
         self.place, self.exclude, self.label = place, exclude, None
+        self.last_sent = None
         # players and browsers already upscaled the video to the window: bring it back
         # to its real size (detected, see native_res) so the network sees real pixels;
         # until that is known, just cap the height (never upscale here)
         k = native_h / h if native_h else min(1.0, max_input / h)
+        if t["engine"] == "neural":
+            k = 1.0   # ClearFrame's network restores the picture as shown: never scale it down first
         in_h, in_w = int(h * k) // 2 * 2, int(w * k) // 2 * 2
         if place:
             target = place[3]
@@ -244,10 +259,10 @@ class Output:
                                    exclude_from_capture=exclude)
         self.stage = None
         fmt, feed_w, feed_h = "bgra", w, h
-        if t["engine"] in ("neural", "nvvfx"):
-            # the network runs here, on the GPU (gpu_stage); mpv only fits its output to the window
+        if t["engine"] == "neural":
+            # the network runs here, on the GPU (gpu_stage); mpv only shows its output
             from gpu_stage import GpuStage
-            self.stage = GpuStage(t["engine"], in_w, in_h, out_w, out_h, t)
+            self.stage = GpuStage(w, h, t.get("strength", 0.5))
             fmt, feed_w, feed_h = "rgb24", self.stage.out_w, self.stage.out_h
             vf = ""
         elif t["engine"] == "none":   # plain scaling, for comparison or non-RTX GPUs
@@ -268,7 +283,7 @@ class Output:
                 "--keep-open=no", "--osd-level=0", "--really-quiet",
                 "--log-file=" + str(ROOT / "live" / "output-mpv.log")]
         self.proc = subprocess.Popen(args + ["-"], stdin=subprocess.PIPE, cwd=str(MPV.parent))
-        source = f"real {in_w}x{in_h}" if native_h else f"{in_w}x{in_h}"
+        source = f"real {in_w}x{in_h}" if native_h and not self.stage else f"{in_w}x{in_h}"
         if self.stage:
             self.engine_label = self.stage.label
             self.info = f"on screen {w}x{h} -> {source} -> {self.stage.label} -> {self.stage.out_w}x{self.stage.out_h}"
@@ -281,12 +296,19 @@ class Output:
         return self.host.hwnd
 
     def write(self, bgra):
+        """Called on every tick of the output clock; only a frame that is new goes to mpv (mpv keeps
+        showing the last one), so a 24 fps video costs 24 copies a second, not 60."""
         try:
             if self.stage:
                 self.stage.submit(bgra)
-                if self.stage.result is not None:
-                    self.proc.stdin.write(self.stage.result)
+                result = self.stage.result
+                if result is not None and result is not self.last_sent:
+                    self.last_sent = result
+                    self.proc.stdin.write(result)
                 return True
+            if bgra is self.last_sent:
+                return True
+            self.last_sent = bgra
             self.proc.stdin.write(np.ascontiguousarray(bgra).data)
             return True
         except (BrokenPipeError, OSError, ValueError):
@@ -513,13 +535,12 @@ def main(argv=None):
     ap.add_argument("--max-input", type=int, default=720, help="downscale captures taller than this before upscaling")
     ap.add_argument("--source-width", type=int, default=None, help="real video width if known (854 = 480p...)")
     ap.add_argument("--overlay", action="store_true", help="show the result over the original video")
-    ap.add_argument("--engine", default="rtx_driver", choices=["neural", "nvvfx", "rtx_driver", "none"])
+    ap.add_argument("--engine", default="rtx_driver", choices=["neural", "rtx_driver", "none"])
+    ap.add_argument("--strength", type=float, default=0.5, help="neural: 0 clean only .. 1 full detail")
     ap.add_argument("--split", action="store_true", help="compare: upscaled left, original right (overlay)")
     ap.add_argument("--split-words", default="WITH|WITHOUT", help="labels of the two sides")
     ap.add_argument("--rtl", action="store_true", help="labels in a right-to-left language")
     ap.add_argument("--accent", default="#76b900")
-    ap.add_argument("--quality", default="high", choices=["low", "medium", "high", "ultra"], help="nvvfx")
-    ap.add_argument("--artifact-reduction", default="strong", choices=["off", "light", "strong"], help="nvvfx")
     ap.add_argument("--fps", type=int, default=60, help="output pacing")
     ap.add_argument("--no-deband", action="store_true")
     ap.add_argument("--deband-strength", type=int, default=48)
@@ -544,10 +565,10 @@ def main(argv=None):
     if args.engine == "neural":
         status("loading the neural network (the first time it is prepared for your GPU, about a minute)...")
         import gpu_stage
-        gpu_stage.prepare()
+        gpu_stage.prepare(args.strength)
     tuning = {"engine": args.engine, "deband": not args.no_deband,
               "deband_strength": args.deband_strength, "deband_grain": args.deband_grain,
-              "quality": args.quality, "artifact_reduction": args.artifact_reduction}
+              "strength": args.strength}
     a = args.accent.lstrip("#")
     style = {"words": tuple(args.split_words.split("|", 1)), "rtl": args.rtl,
              "accent": tuple(int(a[i:i + 2], 16) for i in (0, 2, 4))}

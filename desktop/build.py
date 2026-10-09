@@ -66,8 +66,8 @@ def main():
         "--add-data", f"{HERE / 'ui'};ui",
         "--exclude-module", "cv2", "--runtime-hook", str(stub),
         # the neural engines (PyTorch + TensorRT, several GB) are not packaged yet: the exe offers RTX VSR
-        "--exclude-module", "torch", "--exclude-module", "tensorrt", "--exclude-module", "spandrel",
-        "--exclude-module", "nvvfx", "--exclude-module", "gpu_stage", "--exclude-module", "neural",
+        "--exclude-module", "torch", "--exclude-module", "tensorrt", "--exclude-module", "gpu_stage",
+        "--exclude-module", "neural", "--exclude-module", "archs",
         "--distpath", str(DIST), "--workpath", str(BUILD / "pyinstaller"), "--specpath", str(BUILD),
     ], check=True)
     # mpv next to the exe (live_upscale looks for mpv/mpv.exe there); skip its installer/updater scripts

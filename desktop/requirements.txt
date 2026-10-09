@@ -4,7 +4,5 @@ pystray==0.19.5       # tray icon
 pillow==12.3.0        # tray icon drawing
 windows-capture==2.0.1
 numpy==2.5.3
-# ClearFrame Neural engine (from source; see engine/README.md for the CUDA build of torch):
-#   torch (CUDA), tensorrt, spandrel==0.4.2
-# NVIDIA Video Effects engine (optional, proprietary, installed by the user):
-#   pip install nvidia-vfx --extra-index-url https://pypi.nvidia.com
+# ClearFrame Neural engine and training (from source; see engine/README.md for the CUDA build of torch):
+#   torch (CUDA), torchvision, tensorrt

@@ -3,6 +3,7 @@ window.LANG_NAMES = { en: "English", zh: "中文", hi: "हिन्दी", es:
 window.RTL = ["ar"];
 window.I18N = {
 en: {
+  "up.detail": "Detail", "up.detail_d": "0% only cleans blocks, smear and banding. Higher draws in fine detail and texture, like generative upscalers.", "badge.training": "model in training",
   "cmp.section": "Comparison", "cmp.split": "Test mode: split screen", "cmp.split_d": "Left: upscaled, labelled with the model. Right: the original without it. A divider in the middle.", "home.split": "Split", "hk.split": "Split-screen test", "hk.split_d": "Turns the WITH / WITHOUT comparison on and off.",
   "home.hint_auto": "Put any video fullscreen — ClearFrame starts by itself.",
   "nav.home": "Home", "nav.upscale": "Upscaling", "nav.capture": "Capture & output", "nav.hotkeys": "Hotkeys",
@@ -54,6 +55,7 @@ en: {
   "common.saved": "Saved"
 },
 ru: {
+  "up.detail": "Дорисовка деталей", "up.detail_d": "0% — только чистит квадраты, кашу и ступеньки. Выше — дорисовывает мелкие детали и фактуру, как генеративные апскейлеры.", "badge.training": "модель обучается",
   "cmp.section": "Сравнение", "cmp.split": "Тестовый режим: пополам", "cmp.split_d": "Слева — с улучшением и названием модели, справа — оригинал без него. Посередине разделитель.", "home.split": "Пополам", "hk.split": "Тест пополам", "hk.split_d": "Включает и выключает сравнение С и БЕЗ.",
   "home.hint_auto": "Разверните любое видео на весь экран — ClearFrame включится сам.",
   "nav.home": "Главная", "nav.upscale": "Апскейл", "nav.capture": "Захват и вывод", "nav.hotkeys": "Горячие клавиши",
@@ -105,6 +107,7 @@ ru: {
   "common.saved": "Сохранено"
 },
 zh: {
+  "up.detail": "细节补全", "up.detail_d": "0% 只清除方块、涂抹和色带；越高越会补画细节和纹理，类似生成式超分。", "badge.training": "模型训练中",
   "cmp.section": "对比", "cmp.split": "测试模式：分屏", "cmp.split_d": "左侧为增强后画面并标注模型，右侧为未处理的原始画面，中间有分隔线。", "home.split": "分屏", "hk.split": "分屏测试", "hk.split_d": "开启或关闭“使用 / 不使用”对比。",
   "home.hint_auto": "将任意视频全屏播放——ClearFrame 会自动启动。",
   "nav.home": "主页", "nav.upscale": "超分辨率", "nav.capture": "捕获与输出", "nav.hotkeys": "快捷键",
@@ -156,6 +159,7 @@ zh: {
   "common.saved": "已保存"
 },
 hi: {
+  "up.detail": "डिटेल", "up.detail_d": "0% सिर्फ़ ब्लॉक, धुंधलापन और बैंडिंग साफ़ करता है। ज़्यादा पर बारीक डिटेल और टेक्सचर भी बनाता है, जनरेटिव अपस्केलर की तरह।", "badge.training": "मॉडल ट्रेन हो रहा है",
   "cmp.section": "तुलना", "cmp.split": "टेस्ट मोड: आधी-आधी स्क्रीन", "cmp.split_d": "बाईं ओर अपस्केल की गई तस्वीर और मॉडल का नाम, दाईं ओर बिना बदलाव का मूल। बीच में विभाजक।", "home.split": "आधा-आधा", "hk.split": "आधी स्क्रीन टेस्ट", "hk.split_d": "साथ / बिना तुलना चालू या बंद करता है।",
   "home.hint_auto": "कोई भी वीडियो फ़ुलस्क्रीन करें — ClearFrame अपने आप शुरू होगा।",
   "nav.home": "होम", "nav.upscale": "अपस्केलिंग", "nav.capture": "कैप्चर और आउटपुट", "nav.hotkeys": "हॉटकी",
@@ -207,6 +211,7 @@ hi: {
   "common.saved": "सहेजा गया"
 },
 es: {
+  "up.detail": "Detalle", "up.detail_d": "0 % solo limpia bloques, emborronado y bandas. Más alto dibuja detalle fino y textura, como los escaladores generativos.", "badge.training": "modelo en entrenamiento",
   "cmp.section": "Comparación", "cmp.split": "Modo de prueba: pantalla dividida", "cmp.split_d": "A la izquierda, con escalado y el nombre del modelo; a la derecha, el original sin él. Un divisor en medio.", "home.split": "Dividir", "hk.split": "Prueba en pantalla dividida", "hk.split_d": "Activa y desactiva la comparación CON / SIN.",
   "home.hint_auto": "Pon cualquier vídeo a pantalla completa: ClearFrame se inicia solo.",
   "nav.home": "Inicio", "nav.upscale": "Escalado", "nav.capture": "Captura y salida", "nav.hotkeys": "Atajos",
@@ -258,6 +263,7 @@ es: {
   "common.saved": "Guardado"
 },
 ar: {
+  "up.detail": "التفاصيل", "up.detail_d": "‏0% ينظّف المربعات والتلطيخ والتدرّجات فقط. القيم الأعلى ترسم تفاصيل وملمسًا دقيقًا مثل أدوات التكبير التوليدية.", "badge.training": "النموذج قيد التدريب",
   "cmp.section": "المقارنة", "cmp.split": "وضع الاختبار: شاشة مقسومة", "cmp.split_d": "على اليسار الصورة المحسّنة مع اسم النموذج، وعلى اليمين الأصل دون تحسين، وبينهما فاصل.", "home.split": "تقسيم", "hk.split": "اختبار الشاشة المقسومة", "hk.split_d": "يشغّل مقارنة «مع / بدون» ويوقفها.",
   "home.hint_auto": "اعرض أي فيديو بملء الشاشة — سيبدأ ClearFrame تلقائيًا.",
   "nav.home": "الرئيسية", "nav.upscale": "تحسين الدقة", "nav.capture": "الالتقاط والإخراج", "nav.hotkeys": "الاختصارات",
@@ -309,6 +315,7 @@ ar: {
   "common.saved": "تم الحفظ"
 },
 fr: {
+  "up.detail": "Détail", "up.detail_d": "0 % nettoie seulement les blocs, le flou et les bandes. Plus haut, dessine le détail fin et la texture, comme les upscalers génératifs.", "badge.training": "modèle en entraînement",
   "cmp.section": "Comparaison", "cmp.split": "Mode test : écran partagé", "cmp.split_d": "À gauche, l’image améliorée avec le nom du modèle ; à droite, l’original sans traitement. Un séparateur au milieu.", "home.split": "Partager", "hk.split": "Test en écran partagé", "hk.split_d": "Active ou désactive la comparaison AVEC / SANS.",
   "home.hint_auto": "Mettez une vidéo en plein écran : ClearFrame démarre tout seul.",
   "nav.home": "Accueil", "nav.upscale": "Upscaling", "nav.capture": "Capture et sortie", "nav.hotkeys": "Raccourcis",
@@ -360,6 +367,7 @@ fr: {
   "common.saved": "Enregistré"
 },
 bn: {
+  "up.detail": "ডিটেইল", "up.detail_d": "০% শুধু ব্লক, ঝাপসাভাব ও ব্যান্ডিং পরিষ্কার করে। বেশি দিলে সূক্ষ্ম ডিটেইল ও টেক্সচারও আঁকে, জেনারেটিভ আপস্কেলারের মতো।", "badge.training": "মডেল ট্রেনিং চলছে",
   "cmp.section": "তুলনা", "cmp.split": "টেস্ট মোড: অর্ধেক-অর্ধেক স্ক্রিন", "cmp.split_d": "বাঁয়ে আপস্কেল করা ছবি ও মডেলের নাম, ডানে কোনো বদল ছাড়া আসল। মাঝে বিভাজক।", "home.split": "অর্ধেক", "hk.split": "অর্ধেক স্ক্রিন টেস্ট", "hk.split_d": "সহ / ছাড়া তুলনা চালু বা বন্ধ করে।",
   "home.hint_auto": "যেকোনো ভিডিও ফুলস্ক্রিন করুন — ClearFrame নিজে থেকেই শুরু হবে।",
   "nav.home": "হোম", "nav.upscale": "আপস্কেলিং", "nav.capture": "ক্যাপচার ও আউটপুট", "nav.hotkeys": "হটকি",

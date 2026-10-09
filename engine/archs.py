@@ -67,6 +67,32 @@ class SPAN(nn.Module):
         return self.up(out)
 
 
+class ClearFrameNet(nn.Module):
+    """ClearFrame's own network: restoration (scale 1) or restoration + upscale (scale 2) of streamed
+    live action. The frame is pixel-unshuffled 2x first, so the body runs on a quarter of the pixels
+    (what makes 1080p real-time on a laptop GPU); SPAN-style attention blocks in between; the result
+    is added to the (resized) input, so the network only learns the correction."""
+
+    def __init__(self, scale=1, features=48, blocks=4, channels=3):
+        super().__init__()
+        self.scale = scale
+        c = channels * 4                      # after pixel_unshuffle(2)
+        self.head = nn.Conv2d(c, features, 3, padding=1)
+        self.blocks = nn.ModuleList(SPAB(features) for _ in range(blocks))
+        self.fuse = nn.Conv2d(features * 2, features, 1)
+        self.tail = nn.Conv2d(features, channels * (2 * scale) ** 2, 3, padding=1)
+        self.shuffle = nn.PixelShuffle(2 * scale)
+
+    def forward(self, x):
+        head = self.head(F.pixel_unshuffle(x, 2))
+        out = head
+        for block in self.blocks:
+            out, _ = block(out)
+        out = self.tail(self.fuse(torch.cat([head, out], dim=1)))
+        base = x if self.scale == 1 else F.interpolate(x, scale_factor=self.scale, mode="bilinear", align_corners=False)
+        return base + self.shuffle(out)
+
+
 # name -> constructor (scale is passed in)
 MODELS = {
     "compact-24x8": lambda s: Compact(s, 24, 8),     # "super-ultra-compact"
@@ -76,6 +102,11 @@ MODELS = {
     "compact-64x32": lambda s: Compact(s, 64, 32),   # general-x4v3 size
     "span-32x6": lambda s: SPAN(s, 32, 6),
     "span-48x6": lambda s: SPAN(s, 48, 6),            # paper default
+    "cf-32x4": lambda s: ClearFrameNet(s, 32, 4),
+    "cf-48x4": lambda s: ClearFrameNet(s, 48, 4),
+    "cf-48x6": lambda s: ClearFrameNet(s, 48, 6),
+    "cf-64x4": lambda s: ClearFrameNet(s, 64, 4),
+    "cf-64x6": lambda s: ClearFrameNet(s, 64, 6),
 }
 
 

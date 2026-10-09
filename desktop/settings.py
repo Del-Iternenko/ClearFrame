@@ -33,9 +33,8 @@ SCHEMA = {
     "output": ("overlay", ["overlay", "window"]),
     "window_height": (1440, [1080, 1440, 2160]),
     # upscaling
-    "engine": ("clearframe", ["clearframe", "nvvfx", "rtx_driver", "none"]),
-    "quality": ("high", ["low", "medium", "high", "ultra"]),
-    "artifact_reduction": ("strong", ["off", "light", "strong"]),
+    "engine": ("clearframe", ["clearframe", "rtx_driver", "none"]),
+    "detail_strength": (50, [0, 25, 50, 75, 100]),   # ClearFrame Neural: 0 clean only .. 100 full detail
     "source": ("auto", ["auto", "360p", "480p", "720p", "1080p"]),
     "deband": (True, bool),
     "deband_strength": (48, (16, 128)),

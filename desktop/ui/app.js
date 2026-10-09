@@ -124,7 +124,7 @@ function pageHome() {
     h("button", { class: "btn" + (S.settings.split_compare ? " primary" : ""), onclick: () => set("split_compare", !S.settings.split_compare) }, icon("columns-2", "sm"), t("home.split")),
     h("button", { class: "btn", onclick: () => api().stop() }, icon("x", "sm"), t("home.stop")),
   ] : [];
-  const SHORT = { rtx_driver: "RTX VSR", nvvfx: "NVIDIA VFX", clearframe: "ClearFrame Neural" };
+  const SHORT = { rtx_driver: "RTX VSR", clearframe: "ClearFrame Neural" };
   const engineName = SHORT[S.settings.engine] || t("engine." + S.settings.engine);
   const modeCard = (id, ic, title, desc, active, onclick) => h("button", { class: "card mode" + (active ? " active" : ""), onclick },
     h("div", { class: "t" }, icon(ic), t(title)), h("div", { class: "d" }, t(desc)));
@@ -144,19 +144,14 @@ function pageHome() {
 }
 
 function pageUpscale() {
-  // NVIDIA VFX runs with its own engine and for ClearFrame Neural's inputs bigger than 1024x576
-  const nvvfx = ["nvvfx", "clearframe"].includes(S.settings.engine) && S.engines.nvvfx;
-  const engines = ["clearframe", "nvvfx", "rtx_driver", "none"];
+  const engines = ["clearframe", "rtx_driver", "none"];
   const missing = engines.filter(o => S.engines[o] === false);
-  // quality / artifact reduction are NVIDIA VFX controls: greyed with another engine, badged when VFX isn't installed
-  const vfxBadge = S.engines.nvvfx ? null : { key: "badge.sdk", cls: "warn" };
+  const neural = S.settings.engine === "clearframe" && S.engines.clearframe;
   return h("div", { class: "page" }, ...pageHead("up.title", "up.lead"),
     ...section("up.s_engine", null,
-      row({ icon: "cpu", title: "up.engine", desc: "up.engine_d", control: select("engine", engines, o => t("engine." + o) + (o === "clearframe" ? " · " + t("badge.best") : "") + (missing.includes(o) ? " · " + t("badge.missing") : ""), missing) }),
-      row({ icon: "gauge", title: "up.quality", desc: "up.quality_d", disabled: !nvvfx, badge: vfxBadge,
-        control: seg("quality", ["low", "medium", "high", "ultra"], o => t("q." + o)) }),
-      row({ icon: "wand-sparkles", title: "up.ar", desc: "up.ar_d", disabled: !nvvfx, badge: vfxBadge,
-        control: seg("artifact_reduction", ["off", "light", "strong"], o => t("ar." + o)) }),
+      row({ icon: "cpu", title: "up.engine", desc: "up.engine_d", control: select("engine", engines, o => t("engine." + o) + (o === "clearframe" ? " · " + t("badge.best") : "") + (missing.includes(o) ? " · " + t("badge.training") : ""), missing) }),
+      row({ icon: "wand-sparkles", title: "up.detail", desc: "up.detail_d", disabled: !neural,
+        control: seg("detail_strength", [0, 25, 50, 75, 100], o => o + "%") }),
       row({ icon: "film", title: "up.source", desc: "up.source_d", control: seg("source", ["auto", "360p", "480p", "720p", "1080p"], o => o === "auto" ? t("src.auto") : o) })),
     ...section("cmp.section", null,
       row({ icon: "columns-2", title: "cmp.split", desc: "cmp.split_d", control: toggle("split_compare") })),

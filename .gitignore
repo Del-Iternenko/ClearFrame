@@ -25,3 +25,5 @@ engine/out/
 *.err
 build/
 dist/
+train/data/
+train/runs/
